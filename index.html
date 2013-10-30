@@ -1,0 +1,11 @@
+<script src="./pico.dev.js"></script>
+<script>
+    var noise = {
+        process: function(L, R) {
+            for (var i = 0; i < L.length; i++) {
+                L[i] = R[i] = Math.random() * 0.25;
+            }
+        }
+    };
+	pico.play(noise);
+</script>
