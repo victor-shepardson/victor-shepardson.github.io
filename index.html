@@ -1,14 +1,40 @@
 <script src="./pico.dev.js"></script>
+<script src=http://davidbau.com/encode/seedrandom-min.js></script>
 <script>
-    function synth {
-		var freq = 440;
-		var phase = 0,
-			step = freq/pico.samplerate;
+	function multiply_uint32(a, b) {
+		var ah = (a >> 16) & 0xffff, al = a & 0xffff;
+		var bh = (b >> 16) & 0xffff, bl = b & 0xffff;
+		var high = ((ah * bl) + (al * bh)) & 0xffff;
+		return ((high << 16)>>>0) + (al * bl);
+	}
+	function consume(seed){
+		seed.u=multiply_uint32(seed.u,0xB5262C85);
+		return (seed.u>>>1)*4.6566129e-10;
+	}
+	function grain(mu, sigma, f, t) {
+		return Math.sin(t*Math.PI*2*f)*Math.exp(-Math.pow(mu-t,2)/(sigma*sigma));
+	}
+    function synth() {
+		var freq = 440,
+			cell_seconds = .1;
+		var offset = 0xbeefbeef;
+		var t = 0,
+			sample = 0,
+			frame = 0,
+			step = 1.0/pico.samplerate;
         return {
 			process: function(L, R) {
+				frame++;
+				var cell_samples = pico.samplerate;
+				var cell = Math.ceil(sample/(cell_seconds*cell_samples));
+				var seed = {u:cell^offset};
+				Math.seedrandom(cell^offset);
+				var rf = freq+freq*Math.random();
 				for (var i = 0; i < L.length; i++) {
-					L[i] = R[i] = Math.sin(2*Math.PI*phase)*.25;
-					phase+=step;
+					var mu = (cell-.5)*cell_seconds;
+					L[i] = R[i] = grain(mu, cell_seconds/4, rf, t);
+					t+=step;
+					sample++;
 				}
             }
         };
