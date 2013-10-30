@@ -1,3 +1,11 @@
+<!DOCTYPE html>
+<html>
+<body>
+<input type="range" id="frames" min="4" max="512" step="1" value = "100">
+<input type="range" id="impulses" min="1" max="16" step="1" value = "2" >
+<input type="range" id="pulse" min="0" max="1" step=".01" value = "1" >
+<input type="range" id="spread" min="0" max="1" step=".01" value = "1">
+<input type="range" id="tones" min="1" max="16" step="1" value = "7">
 <script src="./pico.dev.js"></script>
 <script src="./seedrandom.js"></script>
 <script>
@@ -5,20 +13,21 @@
 		return Math.sin(t*Math.PI*2*f)*Math.exp(-Math.pow(mu-t,2)/(sigma*sigma));
 	}
     function synth() {
-		var freq = 220,
-			cell_frames = 32,
-			impulses = 16,
-			pulse = 1,
-			spread = .5,
-			tones = 7;
-		var norm = 1/(1.5+3*Math.log(impulses));
+		var freq = 220;
 		var offset = 0xbeefbeef;
+		var delay = .01;
 		var t = 0,
 			sample = 0,
 			frame = 0,
 			step = 1.0/pico.samplerate;
         return {
 			process: function(L, R) {
+				var cell_frames = document.getElementById("frames").value,
+					impulses = document.getElementById("impulses").value,
+					pulse = document.getElementById("pulse").value,
+					spread = document.getElementById("spread").value,
+					tones = document.getElementById("tones").value;
+				var norm = 1/(2+3*Math.log(impulses));
 				var cell_seconds = cell_frames*L.length/pico.samplerate;
 				var cell = Math.floor(frame/cell_frames);
 				for(var c= -1; c<=1; c++){
@@ -26,8 +35,9 @@
 					Math.seedrandom(cc^offset);
 					var rf = [], mu = [], pan = [];
 					for (var i = 0; i < impulses; i++) {
-						rf[i] = freq*(1+Math.floor(Math.random()*tones)*(7)/(tones-1));
-						mu[i] = (cc+pulse*Math.random())*cell_seconds;
+						if(tones>1) rf[i] = freq*(1+Math.floor(Math.random()*tones)*(7)/(tones-1));
+						else rf[i] = freq;
+						mu[i] = (cc+.5+(1-2*delay)*pulse*(Math.random()-.5))*cell_seconds;
 						pan[i] = .5+.5*spread*(Math.random()-.5);
 					}
 					var local_t = t;
@@ -35,12 +45,14 @@
 					for (var i = 0; i < L.length; i++) {
 						var ls =0, rs=0;;
 						for (var j = 0; j < impulses; j++) {
-							var s= norm*grain(mu[j], cell_seconds/3, rf[j], local_t);
+							/*var s= grain(mu[j], cell_seconds/3, rf[j], local_t);
 							ls += s*pan[j];
-							rs += s*(1-pan[j]);
+							rs += s*(1-pan[j]);*/
+							ls = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(pan[j]-.5))*(.5+.5*pan[j]);
+							rs = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(.5-pan[j]))*(.5+.5*(1-pan[j]));
 						}
 						if(c==-1) { L[i]=R[i]=0; }
-						L[i] += ls; R[i]+=rs;
+						L[i] += ls*norm; R[i]+=rs*norm;
 						local_t+=step;
 	//					local_sample++;
 					}
@@ -53,3 +65,5 @@
     }
 	pico.play(synth());
 </script>
+</body>
+</html>
