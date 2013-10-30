@@ -1,13 +1,9 @@
 <script src="./pico.dev.js"></script>
 <script>
     var noise = {
-		var freq = 440;
-		var phase = 0,
-			step = freq/pico.samplerate;
         process: function(L, R) {
             for (var i = 0; i < L.length; i++) {
-                L[i] = R[i] = Math.sin(2*Math.PI*phase)*.25;
-				phase+=step;
+                L[i] = R[i] = Math.random() * 0.25;
             }
         }
     };
