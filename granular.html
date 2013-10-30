@@ -4,7 +4,7 @@
 <input type="range" id="frames" min="4" max="512" step="1" value = "100">
 <input type="range" id="impulses" min="1" max="16" step="1" value = "2" >
 <input type="range" id="pulse" min="0" max="1" step=".01" value = "1" >
-<input type="range" id="spread" min="0" max="1" step=".01" value = "1">
+<input type="range" id="spread" min="0" max="1" step=".01" value = ".5">
 <input type="range" id="tones" min="1" max="16" step="1" value = "7">
 <script src="./pico.dev.js"></script>
 <script src="./seedrandom.js"></script>
@@ -48,8 +48,8 @@
 							/*var s= grain(mu[j], cell_seconds/3, rf[j], local_t);
 							ls += s*pan[j];
 							rs += s*(1-pan[j]);*/
-							ls = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(pan[j]-.5))*(.5+.5*pan[j]);
-							rs = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(.5-pan[j]))*(.5+.5*(1-pan[j]));
+							ls = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(pan[j]-.5))*pan[j];
+							rs = grain(mu[j], cell_seconds/3, rf[j], local_t + delay*(.5-pan[j]))*(1-pan[j]);
 						}
 						if(c==-1) { L[i]=R[i]=0; }
 						L[i] += ls*norm; R[i]+=rs*norm;
