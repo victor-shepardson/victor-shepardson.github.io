@@ -1,15 +1,17 @@
 <script src="./pico.dev.js"></script>
 <script>
-    var noise = {
+    function synth {
 		var freq = 440;
 		var phase = 0,
 			step = freq/pico.samplerate;
-        process: function(L, R) {
-            for (var i = 0; i < L.length; i++) {
-                L[i] = R[i] = Math.sin(2*Math.PI*phase)*.25;
-				phase+=step;
+        return {
+			process: function(L, R) {
+				for (var i = 0; i < L.length; i++) {
+					L[i] = R[i] = Math.sin(2*Math.PI*phase)*.25;
+					phase+=step;
+				}
             }
         }
     };
-	pico.play(noise);
+	pico.play(synth());
 </script>
