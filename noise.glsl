@@ -5,10 +5,10 @@ precision mediump float;
 #endif
 
 #define PI 3.1415926535897932384626
-#define IMPULSE_CAP 10
+#define IMPULSE_CAP 100
 #define EPSILON .001
 #define C1 4099.
-#define C2 4099.
+#define C2 4111.
 
 varying vec2 vTextureCoordinates;
 
@@ -34,18 +34,19 @@ float permute(in float x) { //from Ian Ashima: https://github.com/ashima/webgl-n
   return mod289(((x*34.0)+1.0)*x);
 }
 float nextRand(inout float u){//rng
-	u = permute(u);
-    //u = fract(C2*cos(u + C1 * cos(u)));
-	return u*(1.0/289.0);
+	//u = fract(sin(u*91.2228) * 43758.5453);
+	//u = permute(u);
+    u = fract(C2*cos(u + C1 * cos(u)));
+	return u;//*(1.0/289.0);
 }
 float seed(in vec2 p){
-	vec2 temp = p*2.;
+	/*vec2 temp = p*2.;
 	if(p.x < 1.) temp.x+=1.;
-	if(p.y < 0.) temp.y+=1.;
-	return permute(temp.x+permute(temp.y));
-	//vec2 temp = p;
-	//float temp2 = nextRand(temp.y) + temp.x;
-	//return nextRand(temp2);
+	if(p.y < 1.) temp.y+=1.;
+	return permute(temp.x+permute(temp.y));*/
+	vec2 temp = p;
+	float temp2 = nextRand(temp.y) + temp.x;
+	return nextRand(temp2);
 }
  
 int poisson(inout float u, in float m){//from Galerne, Lagae, Lefebvre, Drettakis
@@ -63,7 +64,7 @@ float eval_impulse(in float u, in vec2 delta){
 	//evaluate kernel, accumulate fragment value
 	vec2 omega = vec2(cos(iorientation), sin(iorientation));
 	float phi = nextRand(u); //phase - uniform dist [0, 1]
-	return (exp(dot(delta,delta)*-PI*ifreq*ifreq)*cos(2.*PI*(ifreq*dot(delta, omega)+phi)));
+	return (exp(dot(delta,delta)*-PI)*cos(2.*PI*(ifreq*gridSize*dot(delta, omega)+phi)));
 	//e ^ -(disp^2 / 2*sigma^2)
 }
 
@@ -74,12 +75,15 @@ float eval_impulse(in float u, in vec2 delta){
 	float acc = 0.;
 	//for impulses
 	for(int k=0; k<IMPULSE_CAP; k++){
-		if(k>=impulses) {break;}
-		//position of impulse in cell space - uniform distribution
-		vec2 ipos = vec2(nextRand(u), nextRand(u));
-		//displacement to fragment
-		vec2 delta = (cpos - ipos - vec2(dnbr))*gridSize;
-		acc += eval_impulse(u, delta);
+		if(k>=impulses){
+			break;
+		}else{ //mysterious bug on windows requires this else
+			//position of impulse in cell space - uniform distribution
+			vec2 ipos = vec2(nextRand(u), nextRand(u));
+			//displacement to fragment
+			vec2 delta = (cpos - ipos - vec2(dnbr));//*gridSize;
+			acc += eval_impulse(u, delta);
+		}
 	}
 	return acc;
  }
@@ -106,7 +110,7 @@ void main(void){
 		eval_cell(ivec2( 1,  1));
 	
 	//normalize / clamp
-	//value*=norm;
+	value*=norm;
 	value= value*.5+.5;
 	//monochrome
 	vec3 c = vec3(value,value,value);
