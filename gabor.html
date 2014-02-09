@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html>
 <body>
+<div id='control'></div>
 <div id='main'></div>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script src="./gl-matrix-min.js"></script>
 <script>
+	console.log('starting...')
 	loadShaders();
 	var viewportWidth=512, viewportHeight=512;
 	var sliderh = 100;
-	var numsliders = 3;
+	var numsliders = 5;
 	var sliders = [];
 	for(var i=0; i<numsliders; i++){
 		sliders[i] =
 			$('<input type="range">')
-			.appendTo($('#main'))
+			.appendTo($('#control'))
 			.attr({
-				min: 4,
-				max: 512,
-				step: 1,
-				value: 100
+				min: 0,
+				max: 1,
+				step: 0.001,
+				value: .5
 			});
 	}
 	var gl = $('<canvas/>')
@@ -40,6 +42,10 @@
 		-1.0, -1.0, 0.0
 	];
 
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
+	vertexPositionsBuffer.itemSize = 3;
+	vertexPositionsBuffer.numItems = 4;
+	
 	var textureCoordinatesBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
 	var s = viewportWidth/512.0;
@@ -54,17 +60,15 @@
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
 	textureCoordinatesBuffer.itemSize = 2;
 	textureCoordinatesBuffer.numItems = 4;
-	
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
-	vertexPositionsBuffer.itemSize = 3;
-	vertexPositionsBuffer.numItems = 4;
 
-	var modelViewMatrix = mat4.create();
-	var projectionMatrix = mat4.create();
+//	var modelViewMatrix = mat4.create();
+	//var projectionMatrix = mat4.create();
 
 	var program = createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer);
 	gl.useProgram(program);
 
+	frame();
+/*	
 	$(document).keydown( function(event) {
 		event.preventDefault();
 		var key = event.which;
@@ -76,7 +80,7 @@
 		// [0,0] being in the left bottom corner to match the vertex coordinates
 		var x = (event.pageX / viewportWidth)*2.0 - 1.0;
 		var y = 0.0 - ((event.pageY / viewportHeight)*2.0 - 1.0);
-		gl.uniform2f(program.mouseUniform, x, y);
+		//gl.uniform2f(program.mouseUniform, x, y);
 	});
 
 	$(document).mousedown( function(event) {
@@ -101,23 +105,28 @@
 		event.preventDefault();
 		gl.uniform2f(program.mouseUniform, 0, 0);
 	});
-
+*/
 	var vshader, fshader;
 	function loadShaders(){
+		console.log("loading shaders...");
 		$.ajax({
 			url: './vshader.glsl',
 			success: function(result) {
 				vshader = result;
+				console.log('vertex shader...');
 			},
-			async:   false
+			async: false
 		});
 		$.ajax({
 			url: './noise.glsl',
 			success: function(result) {
 				fshader = result;
+				console.log('fragment shader...');
             },
-			async:   false
+			async: false
 		});
+		while(!vshader || !fshader) {}
+		console.log('loaded');
 	}
 	
 	function createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer) {
@@ -126,7 +135,7 @@
 		gl.shaderSource(vertexShader, vshader);
 		gl.compileShader(vertexShader);
 		if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-			alert(gl.getShaderInfoLog(vertexShader));
+			console.log(vshader+"\nvshader: "+gl.getShaderInfoLog(vertexShader));
 		}
   
 		// create fragment shader
@@ -134,7 +143,7 @@
 		gl.shaderSource(fragmentShader, fshader);
 		gl.compileShader(fragmentShader);
 		if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-			alert(gl.getShaderInfoLog(fragmentShader));
+			console.log("fshader: "+gl.getShaderInfoLog(fragmentShader));
 		}
 		  
 		// create and use program
@@ -143,45 +152,53 @@
 		gl.attachShader(program, fragmentShader);
 		gl.linkProgram(program);
 		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-			alert(gl.getProgramInfoLog(program));
+			console.log("link: "+gl.getProgramInfoLog(program));
 		}
 		  
 		// vertex attribute [position]
 		program.vertexPositionAttribute = gl.getAttribLocation(program, "aVertexPosition");
 		gl.enableVertexAttribArray(program.vertexPositionAttribute);
-		//gl.vertexAttribPointer(program.vertexPositionAttribute, vertexPositionsBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
 		// vertex attribute [texture coordinates]
 		program.textureCoordinatesAttribute = gl.getAttribLocation(program, "aTextureCoordinates");
 		gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
-		//gl.vertexAttribPointer(program.textureCoordinatesAttribute, textureCoordinatesBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
 		// uniform variables [modelViewMatrix and projectionMatrix]
-		program.mvMatrixUniform = gl.getUniformLocation(program, "modelViewMatrix");
-		program.pMatrixUniform = gl.getUniformLocation(program, "projectionMatrix");
-		program.tex0Uniform = gl.getUniformLocation(program, "tex0");
-		program.timeUniform = gl.getUniformLocation(program, "time");
-		program.mouseUniform = gl.getUniformLocation(program, "mouse");
-		program.mouseLeftUniform = gl.getUniformLocation(program, "mouseLeft");
-
+	//	program.mvMatrixUniform = gl.getUniformLocation(program, "modelViewMatrix");
+		//program.pMatrixUniform = gl.getUniformLocation(program, "projectionMatrix");
+		program.gridSize = gl.getUniformLocation(program, "gridSize");
+		program.density = gl.getUniformLocation(program, "density");
+		program.harmonic = gl.getUniformLocation(program, "harmonic");
+	
 		return program;
 	}
 
-	function updateMatrices(program, mvMatrix, pMatrix) {
+/*	function updateMatrices(program, mvMatrix, pMatrix) {
 		gl.uniformMatrix4fv(program.pMatrixUniform, false, pMatrix);
 		gl.uniformMatrix4fv(program.mvMatrixUniform, false, mvMatrix);
 	}
-
+*/
 	function frame() {
+		var gridSize = sliders[0].val()*128.;
+		var density = sliders[1].val()*100.;
+		var freq = sliders[2].val()*.5;
+		var orientation = sliders[3].val()*2.*3.14;
+		var isotropy = sliders[4].val()*3.14;
+		gl.uniform2f(program.origin, 0, 0);
+		gl.uniform1f(program.gridSize, gridSize);
+		gl.uniform1f(program.density, density);
+		//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
+		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
+		
 		gl.viewport(0, 0, viewportWidth, viewportHeight);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 		//mat4.perspective(45, viewportWidth/viewportHeight, 0.1, 100.0, projectionMatrix);
-		mat4.ortho(-1.0, 1.0, -1.0, 1.0, 0.1, 100.0, projectionMatrix);
-		mat4.identity(modelViewMatrix);
-		mat4.translate(modelViewMatrix, [0.0, 0.0, -2.0]);
+//		mat4.ortho(-1.0, 1.0, -1.0, 1.0, 0.1, 100.0, projectionMatrix);
+//		mat4.identity(modelViewMatrix);
+//		mat4.translate(modelViewMatrix, [0.0, 0.0, -2.0]);
 
-		updateMatrices(program, modelViewMatrix, projectionMatrix);
+//		updateMatrices(program, modelViewMatrix, projectionMatrix);
 	
 		// plug buffers to the corresponding vertex attributes
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
@@ -189,6 +206,8 @@
 		gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
 		gl.vertexAttribPointer(program.textureCoordinatesAttribute, textureCoordinatesBuffer.itemSize, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexPositionsBuffer.numItems);
+		
+		window.requestAnimationFrame(frame, gl);
 	}
 </script>
 </body>
