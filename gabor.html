@@ -182,12 +182,12 @@
 	}
 
 	function frame() {
-		origin-=1.;
+		origin+=1.;
 		var gridSize = sliders[4].val()*128.+1.;
 		var density = sliders[3].val()*50.;
 		var freq = sliders[0].val()*.25;
 		var orientation = sliders[2].val()*2.*3.14;
-		var isotropy = sliders[1].val()*3.14;
+		var isotropy = sliders[1].val()*.5*3.14;
 		gl.uniform2f(program.origin, origin, origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
