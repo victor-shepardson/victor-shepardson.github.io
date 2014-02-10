@@ -18,19 +18,23 @@
 	var sliderh = 100;
 	var numsliders = 5;
 	var slider_names = ['frequency','isotropy','orientation','density','gridsize'];
+	var slider_text = ["'frequency of noise in pixels'", "'directionality of noise'", "'direction of noise; no effect if isotropy is high'", "'density of impulses/cell for evaluation; trades off performance for accuracy'", "'size of evaluation grid in pixels; controls bandwidth of noise'"];
 	var sliders = [];
 	var origin=0.;
 	for(var i=0; i<numsliders; i++){
-		$('<h3>'+slider_names[i]+'<\h3>').appendTo($('#control'));
+		var span = $('<span title='+slider_text[i]+'><\span>').appendTo($('#control'));
+		var div = $('<div>').appendTo(span);
+		$('<h3>'+slider_names[i]+'<\h3>').appendTo(div);//$('#control'));
 		sliders[i] =
 			$('<input type="range">')
-			.appendTo($('#control'))
+			.appendTo(div)
 			.attr({
 				min: 0,
 				max: 1,
 				step: 0.001,
 				value: .5
 			});
+		$('</span>');
 	}
 	var gl = $('<canvas/>')
 		.appendTo($('#main'))
@@ -178,7 +182,7 @@
 	}
 
 	function frame() {
-		origin+=1.;
+		origin-=1.;
 		var gridSize = sliders[4].val()*128.+1.;
 		var density = sliders[3].val()*50.;
 		var freq = sliders[0].val()*.25;

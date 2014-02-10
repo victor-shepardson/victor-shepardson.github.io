@@ -27,14 +27,12 @@ float lambda = density/PI; //mean impulses per grid cell
 float norm = .33/log2(lambda+2.); //attempt to normalize color value
 
 float nextRand(inout float u){//rng
-	//u = fract(sin(u*91.2228) * 43758.5453);
-	//u = permute(u);
     u = fract(C2*cos(u + C1 * cos(u)));
 	return u;
 }
 float seed(in vec2 p){
 	vec2 temp = p;
-	float temp2 = nextRand(temp.y) + temp.x;
+	float temp2 = nextRand(temp.x) + temp.y;
 	return nextRand(temp2);
 }
  
@@ -46,7 +44,7 @@ int poisson(inout float u, in float m){//from Galerne, Lagae, Lefebvre, Drettaki
 }
 
 //evaluate the contribution to this fragment by a single impulse at displacement delta, in cell with seed u
-float eval_impulse(in float u, in vec2 delta){
+float eval_impulse(inout float u, in vec2 delta){
 	//impulse frequency, orientation - uniform distribution on input ranges
 	float ifreq = mix(harmonic.x, harmonic.y, nextRand(u)); 
 	float iorientation = mix(harmonic.z, harmonic.w, nextRand(u));
@@ -81,11 +79,7 @@ void main(void){
 	pos = gl_FragCoord.xy+origin.xy;
 	vec2 temp = pos/gridSize; 
 	cpos = fract(temp);
-	temp = floor(temp);
-	//correct for negative coordinates
-	vec2 mc = vec2(cpos.x<0., cpos.y<0.);
-	cpos+= mc; temp-= mc;
-	gpos = ivec2(temp);
+	gpos = ivec2(floor(temp));
 	
 	float value = 
 		eval_cell(ivec2(-1, -1)) +
@@ -101,6 +95,7 @@ void main(void){
 	//normalize / clamp
 	value*=norm;
 	value= value*.5+.5;
+	
 	//monochrome
 	vec3 c = vec3(value,value,value);
 	//draw fragment
