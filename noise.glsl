@@ -24,26 +24,15 @@ ivec2 gpos; //cell position in grid space: integer in [-inf, inf]
 
 float lambda = density/PI; //mean impulses per grid cell
 
-float norm = .33/log2(lambda); //attempt to normalize color value
+float norm = .33/log2(lambda+2.); //attempt to normalize color value
 
-
-float mod289(in float x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-float permute(in float x) { //from Ian Ashima: https://github.com/ashima/webgl-noise
-  return mod289(((x*34.0)+1.0)*x);
-}
 float nextRand(inout float u){//rng
 	//u = fract(sin(u*91.2228) * 43758.5453);
 	//u = permute(u);
     u = fract(C2*cos(u + C1 * cos(u)));
-	return u;//*(1.0/289.0);
+	return u;
 }
 float seed(in vec2 p){
-	/*vec2 temp = p*2.;
-	if(p.x < 1.) temp.x+=1.;
-	if(p.y < 1.) temp.y+=1.;
-	return permute(temp.x+permute(temp.y));*/
 	vec2 temp = p;
 	float temp2 = nextRand(temp.y) + temp.x;
 	return nextRand(temp2);

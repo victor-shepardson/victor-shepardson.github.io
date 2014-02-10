@@ -1,18 +1,27 @@
 <!DOCTYPE html>
 <html>
 <body>
-<div id='control'></div>
-<div id='main'></div>
+<h1>
+<a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a> with WebGL
+</h1>
+<table>
+	<tr>
+		<td><div id='control'></div></td>
+		<td><div id='main'></div></td>
+	</tr>
+</table>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-<script src="./gl-matrix-min.js"></script>
 <script>
 	console.log('starting...')
 	loadShaders();
 	var viewportWidth=512, viewportHeight=512;
 	var sliderh = 100;
 	var numsliders = 5;
+	var slider_names = ['frequency','isotropy','orientation','density','gridsize'];
 	var sliders = [];
+	var origin=0.;
 	for(var i=0; i<numsliders; i++){
+		$('<h3>'+slider_names[i]+'<\h3>').appendTo($('#control'));
 		sliders[i] =
 			$('<input type="range">')
 			.appendTo($('#control'))
@@ -60,9 +69,6 @@
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
 	textureCoordinatesBuffer.itemSize = 2;
 	textureCoordinatesBuffer.numItems = 4;
-
-//	var modelViewMatrix = mat4.create();
-	//var projectionMatrix = mat4.create();
 
 	var program = createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer);
 	gl.useProgram(program);
@@ -163,28 +169,22 @@
 		program.textureCoordinatesAttribute = gl.getAttribLocation(program, "aTextureCoordinates");
 		gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
 
-		// uniform variables [modelViewMatrix and projectionMatrix]
-	//	program.mvMatrixUniform = gl.getUniformLocation(program, "modelViewMatrix");
-		//program.pMatrixUniform = gl.getUniformLocation(program, "projectionMatrix");
 		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
+		program.origin = gl.getUniformLocation(program, "origin");
 	
 		return program;
 	}
 
-/*	function updateMatrices(program, mvMatrix, pMatrix) {
-		gl.uniformMatrix4fv(program.pMatrixUniform, false, pMatrix);
-		gl.uniformMatrix4fv(program.mvMatrixUniform, false, mvMatrix);
-	}
-*/
 	function frame() {
-		var gridSize = sliders[0].val()*128.;
-		var density = sliders[1].val()*100.;
-		var freq = sliders[2].val()*.5;
-		var orientation = sliders[3].val()*2.*3.14;
-		var isotropy = sliders[4].val()*3.14;
-		gl.uniform2f(program.origin, 0, 0);
+		origin+=1.;
+		var gridSize = sliders[4].val()*128.+1.;
+		var density = sliders[3].val()*50.;
+		var freq = sliders[0].val()*.25;
+		var orientation = sliders[2].val()*2.*3.14;
+		var isotropy = sliders[1].val()*3.14;
+		gl.uniform2f(program.origin, origin, origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
 		//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
@@ -192,13 +192,6 @@
 		
 		gl.viewport(0, 0, viewportWidth, viewportHeight);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-		//mat4.perspective(45, viewportWidth/viewportHeight, 0.1, 100.0, projectionMatrix);
-//		mat4.ortho(-1.0, 1.0, -1.0, 1.0, 0.1, 100.0, projectionMatrix);
-//		mat4.identity(modelViewMatrix);
-//		mat4.translate(modelViewMatrix, [0.0, 0.0, -2.0]);
-
-//		updateMatrices(program, modelViewMatrix, projectionMatrix);
 	
 		// plug buffers to the corresponding vertex attributes
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
