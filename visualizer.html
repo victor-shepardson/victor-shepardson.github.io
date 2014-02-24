@@ -12,8 +12,13 @@ Audio Visualizer with WebGL
 </table>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script>
-	function onError() {
-		console.log('error');
+	function str2ab(str) {
+		var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+		var bufView = new Uint16Array(buf);
+		for (var i=0, strLen=str.length; i<strLen; i++) {
+			bufView[i] = str.charCodeAt(i);
+		}
+		return buf;
 	}
 	//init audio stuff
 	console.log('init audio...')
@@ -33,16 +38,17 @@ Audio Visualizer with WebGL
 	//load audio
 	console.log('loading audio');
 	var inputBuffer = null;
-	loadSound('./3s_e_major_0.ogg');
+	loadSound('sample.ogg');
 	function loadSound(url) {
 		/*request = $.ajax({
 			url: url,
 			beforeSend: function(request){
 				request.responseType = 'arraybuffer';
 			},
-			success: function(result, status, request) {
-				console.log(typeof request.response);
-				context.decodeAudioData(result, function(buffer) {
+			success: function(result){//, status, request) {
+				console.log((typeof result)+' loaded,');
+				context.decodeAudioData(str2ab(result), function(buffer) {
+					console.log('converted to ' +(typeof buffer));
 					inputBuffer = buffer;
 				});
 				console.log('audio data');
@@ -65,6 +71,27 @@ Audio Visualizer with WebGL
 		}
 		request.send();
 		
+		/*var inputBuffer = null;
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', './BLOODMOUTH.mp3', true);
+		xhr.overrideMimeType('text/plain; charset=x-user-defined');
+		xhr.onreadystatechange = function(event) {
+			if ( this.readyState == 4 && this.status == 200 ) {
+				var buf = new ArrayBuffer(binaryString.length);
+				var bufv = new Uint8Array(buf);
+				var binaryString = this.responseText;
+				for (var i = 0, len = binaryString.length; i < len; ++i) {
+					var c = binaryString.charCodeAt(i);
+					var byte = c & 0xff; //it gives you the byte at i
+					bufv[i] = byte;
+				}
+				context.decodeAudioData(buf, function(buffer) {
+					inputBuffer = buffer;
+				});
+			}
+		};
+		xhr.send();
+		*/
 	}
 	
 	//init gl stuff
@@ -132,7 +159,7 @@ Audio Visualizer with WebGL
 
 	
 	//block until all resources loaded
-	blockUntilLoaded();
+	//blockUntilLoaded();
 	function blockUntilLoaded(){
 		while(!vshader || !fshader || !inputBuffer) {}
 		console.log('loaded');
