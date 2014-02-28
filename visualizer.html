@@ -2,7 +2,7 @@
 <html>
 <body>
 <h1>
-Audio Visualizer with WebGL
+Audio Visualizer with WebGL & WebAudio
 </h1>
 <table>
 	<tr>
@@ -41,11 +41,11 @@ Audio Visualizer with WebGL
 		fft = new Float32Array(fftNode.frequencyBinCount);
 		function playSound(buffer) {
 			var source = context.createBufferSource(); // creates a sound source
+			source.loop=true;
 			source.buffer = buffer;                    // tell the source which sound to play
 			source.connect(fftNode);
 			source.connect(context.destination);       // connect the source to the context's destination (the speakers)
 			source.start(0);                           // play the source now
-												 // note: on older systems, may have to use deprecated noteOn(time);
 		}
 		
 		//init gl stuff
@@ -53,9 +53,9 @@ Audio Visualizer with WebGL
 		loadShaders();
 		var viewportWidth=512, viewportHeight=512;
 		var sliderh = 100;
-		var numsliders = 5;
-		var slider_names = ['frequency','isotropy','orientation','density','gridsize'];
-		var slider_text = ["'frequency of noise in pixels'", "'directionality of noise'", "'direction of noise; no effect if isotropy is high'", "'density of impulses/cell for evaluation; trades off performance for accuracy'", "'size of evaluation grid in pixels; controls bandwidth of noise'"];
+		var numsliders = 7;
+		var slider_names = ['floor','magnitude','scale','nspeed','hspeed','harmonic','spread'];
+		var slider_text = ["'floor in dB for each band'","'magnitude of warping'","'scale of visual noise'","'speed of noise mutation'","'speed of harmonic'","'frequency of harmonic'","'color spread'"];
 		var sliders = [];
 		var origin=0.;
 		for(var i=0; i<numsliders; i++){
@@ -134,7 +134,7 @@ Audio Visualizer with WebGL
 		});*/
 
 		$(document).mousemove( function(event) {
-			event.preventDefault();
+			//event.preventDefault();
 			//get pixel position in canvas to pass to shader
 			var os = $('#canvas').offset()
 			var x = event.pageX-os.left;
@@ -225,7 +225,13 @@ Audio Visualizer with WebGL
 			program.b0 = gl.getUniformLocation(program, "b0");
 			program.b1 = gl.getUniformLocation(program, "b1");
 			program.mouse = gl.getUniformLocation(program, "mouse");
-		
+			program.nspeed = gl.getUniformLocation(program, "nspeed");
+			program.hspeed = gl.getUniformLocation(program, "hspeed");
+			program.magnitude = gl.getUniformLocation(program, "magnitude");
+			program.scale = gl.getUniformLocation(program, "scale");
+			program.harmonic = gl.getUniformLocation(program, "harmonic");
+			program.spread = gl.getUniformLocation(program, "spread");
+
 			return program;
 		}
 
@@ -234,7 +240,6 @@ Audio Visualizer with WebGL
 			var sum = 0;
 			for (var i=0;i<array.length;i++)
 				sum+=array[i];
-			//console.log(sum/array.length);
 			return sum/array.length;
 		}
 		function sum(array){
@@ -243,19 +248,27 @@ Audio Visualizer with WebGL
 				sum+=array[i];
 			return sum;
 		}
+		function max(array){
+			var max = array[0];
+			for (var i=1;i<array.length;i++)
+				max = Math.max(max,array[i]);
+			return max;
+		}
 
 		function frame() {
+			var floor = sliders[0].val()*80+50;
+			var magnitude = sliders[1].val()*16;
+			var scale = sliders[2].val()*1;
+			var nspeed = sliders[3].val()*.05;
+			var hspeed = sliders[4].val()*2.;
+			var harmonic = sliders[5].val(); harmonic = harmonic*harmonic*64.;
+			var spread = sliders[6].val();
 			var bins = [0,0,0,0,0,0,0,0];
 			if(inputBuffer){
 			
 				fftNode.getFloatFrequencyData(fft);
 				//console.log(fft);
-				//console.log(sync);
-						
-				var floor = 100;
-				//var m = Math.max(mean(fft),-floor)*(1/floor)+1;
-				//if (m>0) console.log(m);
-				//sync+=m;
+				
 				var n = 1;
 				var k = 0;
 				for(var i=0;i<bins.length;i++){
@@ -268,18 +281,26 @@ Audio Visualizer with WebGL
 						k++;
 					}
 					bins[i]/=n;
+					//bins[i]*=bins[i];
 					n*=2;
 				}
 				time+=mean(bins);//bins[0];
 				
-				if(sum(bins)>0)
+				if(max(bins)>1)
 					console.log(bins);
 			}
+
 			
 			gl.uniform4f(program.b0, bins[0], bins[1], bins[2], bins[3]);
 			gl.uniform4f(program.b1, bins[4], bins[5], bins[6], bins[7]);
 			gl.uniform1f(program.time, time);
-			
+			gl.uniform1f(program.nspeed, nspeed);
+			gl.uniform1f(program.hspeed, hspeed);
+			gl.uniform1f(program.scale, scale);
+			gl.uniform1f(program.magnitude, magnitude);
+			gl.uniform1f(program.harmonic, harmonic);
+			gl.uniform1f(program.spread, spread);
+
 			gl.viewport(0, 0, viewportWidth, viewportHeight);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		

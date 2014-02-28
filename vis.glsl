@@ -8,20 +8,27 @@ precision mediump float;
 
 varying vec2 vTextureCoordinates;
 
-uniform float time; //nonrandomness of phase
+uniform float time;
 uniform vec4 b0;
 uniform vec4 b1;
+uniform float nspeed;
+uniform float hspeed;
+uniform float magnitude;
+uniform float scale;
+uniform float harmonic;
+uniform float spread;
 uniform vec2 mouse;
 
-//
-// Description : Array and textureless GLSL 2D simplex noise function.
-//      Author : Ian McEwan, Ashima Arts.
-//  Maintainer : ijm
-//     Lastmod : 20110822 (ijm)
-//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
-//               Distributed under the MIT License. See LICENSE file.
-//               https://github.com/ashima/webgl-noise
-// 
+//simplex noise from:
+	//
+	// Description : Array and textureless GLSL 2D simplex noise function.
+	//      Author : Ian McEwan, Ashima Arts.
+	//  Maintainer : ijm
+	//     Lastmod : 20110822 (ijm)
+	//     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
+	//               Distributed under the MIT License. See LICENSE file.
+	//               https://github.com/ashima/webgl-noise
+	// 
 
 vec4 mod289(vec4 x)
 {
@@ -172,32 +179,43 @@ float snoise(vec2 v){
   return 130.0 * dot(m, g);
 }*/
 
-void main(void){
-	//compute positions for this fragment
-
-	vec2 delta = .01*(gl_FragCoord.xy - mouse);
+float vis(float t){
+	vec2 delta = (1./512.)*(gl_FragCoord.xy - mouse);
 	float env = sqrt(delta.x*delta.x+delta.y*delta.y);
 	
-	vec3 pos = vec3(.125*delta, .01*time);
+	vec3 pos = vec3(scale*delta, nspeed*t);
 	
-	float w = 4.;
+	float w = magnitude;
+	
+	vec4 b = b0+b1;
+	float sum = b.x+b.y+b.z+b.w;
 	
 	float value = 
-		sin(4.*env - .4*time + w*(
-			+ b0.x*snoise( pos )
-			+ .5*b0.y*snoise( 2.*pos ) 
-			+ 1.*b0.z*snoise( 4.*pos )
+		sin(harmonic*env - hspeed*t + w*(
+			+ .5*b0.x*snoise( pos )
+			+ .66*b0.y*snoise( 2.*pos ) 
+			+ .75*b0.z*snoise( 4.*pos )
 			+ 1.*b0.w*snoise( 8.*pos )
-			+ 1.*b1.x*snoise( 16.*pos )
-			+ 2.*b1.y*snoise( 32.*pos )
-			+ 3.*b1.z*snoise( 64.*pos )
-			+ 4.*b1.w*snoise( 128.*pos )
+			+ 1.125*b1.x*snoise( 16.*pos )
+			+ 1.25*b1.y*snoise( 32.*pos )
+			+ 1.5*b1.z*snoise( 64.*pos )
+			+ 2.*b1.w*snoise( 128.*pos )
 			));
 	//normalize / clamp
 	value = .4*value +.5;
+	value*=.66*sum;
+	return value;
+}
+
+void main(void){
+	//compute positions for this fragment
+
+	float r = vis(time-spread*(1.+sin(.13*hspeed*time)));
+	float g = vis(time);
+	float b = vis(time+spread*(1.+sin(.11*hspeed*time)));
 	
 	//monochrome
-	vec3 c = vec3(value,value,value);
+	vec3 c = vec3(r,g,b);
 	//draw fragment
 	gl_FragColor = vec4(c, 1.0);
 }
