@@ -10,35 +10,34 @@ Audio Visualizer with WebGL
 		<td><div id='main'></div></td>
 	</tr>
 </table>
-<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<!-- <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script> -->
+<script src="./jquery-1.11.0.js"></script>
 <script src="./buffer-loader.js"></script>
 <script>
 	window.onload = function() {
-		var sync = 0;
+		var time = 0;
 		//init audio stuff
 		console.log('init audio...')
 		var context;
-		//window.addEventListener('load', init, false);
-		//function init() {
-			try {
-				// Fix up for prefixing
-				window.AudioContext = window.AudioContext||window.webkitAudioContext;
-				context = new AudioContext();
-				console.log(context);
-			}
-			catch(e) {
-				alert('Web Audio API is not supported in this browser');
-			}
-		//}
+		try {
+			window.AudioContext = window.AudioContext||window.webkitAudioContext;
+			context = new AudioContext();
+			console.log(context);
+		}
+		catch(e) {
+			alert('Web Audio API is not supported in this browser');
+		}
 		//load audio
 		console.log('loading audio');
 		var inputBuffer = null;
 		var bufferLoader = new BufferLoader(context, ['./sample.ogg'], function(bufferList){
-			playSound(bufferList[0]);
+			inputBuffer = bufferList[0];
+			console.log(inputBuffer);
+			playSound(inputBuffer);
 		});
 		bufferLoader.load();
 		var fftNode = context.createAnalyser();
-		fftNode.fftSize=128;
+		fftNode.fftSize=512;
 		fft = new Float32Array(fftNode.frequencyBinCount);
 		function playSound(buffer) {
 			var source = context.createBufferSource(); // creates a sound source
@@ -114,12 +113,13 @@ Audio Visualizer with WebGL
 
 		
 		//block until all resources loaded
+		/*
 		blockUntilLoaded();
 		function blockUntilLoaded(){
 			console.log('blocking until shaders loaded');
 			while(!vshader || !fshader) {}
 			console.log('loaded');
-		}
+		}*/
 		
 		//get rollin'
 		var program = createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer);
@@ -135,8 +135,7 @@ Audio Visualizer with WebGL
 
 		$(document).mousemove( function(event) {
 			event.preventDefault();
-			// transforming cursor coordinates to [-1.0, 1.0] range
-			// [0,0] being in the left bottom corner to match the vertex coordinates
+			//get pixel position in canvas to pass to shader
 			var os = $('#canvas').offset()
 			var x = event.pageX-os.left;
 			var y = viewportHeight - (event.pageY-os.top);
@@ -222,11 +221,9 @@ Audio Visualizer with WebGL
 			program.textureCoordinatesAttribute = gl.getAttribLocation(program, "aTextureCoordinates");
 			gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
 
-			program.gridSize = gl.getUniformLocation(program, "gridSize");
-			program.density = gl.getUniformLocation(program, "density");
-			program.harmonic = gl.getUniformLocation(program, "harmonic");
-			program.origin = gl.getUniformLocation(program, "origin");
-			program.sync = gl.getUniformLocation(program, "sync");
+			program.time = gl.getUniformLocation(program, "time");
+			program.b0 = gl.getUniformLocation(program, "b0");
+			program.b1 = gl.getUniformLocation(program, "b1");
 			program.mouse = gl.getUniformLocation(program, "mouse");
 		
 			return program;
@@ -240,43 +237,48 @@ Audio Visualizer with WebGL
 			//console.log(sum/array.length);
 			return sum/array.length;
 		}
+		function sum(array){
+			var sum = 0;
+			for (var i=0;i<array.length;i++)
+				sum+=array[i];
+			return sum;
+		}
 
 		function frame() {
-			fftNode.getFloatFrequencyData(fft);
-			//console.log(fft);
-			//console.log(sync);
-		
-			origin+=1.;
-			var gridSize = sliders[4].val()*128.+1.;
-			var density = sliders[3].val()*50.;
-			//var freq = Math.max(fft[0],-64)*(1/64)+1;//sliders[0].val()*.25;
-			var orientation = Math.max(fft[1],-64)*(1/64)+1;//sliders[2].val()*2.*3.14;
-			var isotropy = Math.max(fft[2],-64)*(1/64)+1;//sliders[1].val()*.5*3.14;
-		
-			var freq = [0,0,0,0,0];
-			var floor = 100;
-			//var m = Math.max(mean(fft),-floor)*(1/floor)+1;
-			//if (m>0) console.log(m);
-			//sync+=m;
-			var n = 1;
-			var k = 0;
-			for(var i=0;i<freq.length;){
-				for(var j=0; j<n; j++){
-					freq[i] += Math.max(fft[k],-floor)*(1/floor)+1;
-					k++;
+			var bins = [0,0,0,0,0,0,0,0];
+			if(inputBuffer){
+			
+				fftNode.getFloatFrequencyData(fft);
+				//console.log(fft);
+				//console.log(sync);
+						
+				var floor = 100;
+				//var m = Math.max(mean(fft),-floor)*(1/floor)+1;
+				//if (m>0) console.log(m);
+				//sync+=m;
+				var n = 1;
+				var k = 0;
+				for(var i=0;i<bins.length;i++){
+					for(var j=0; j<n; j++){
+						if(k==fft.length){
+							console.log(k);
+							break;
+						}
+						bins[i] += Math.max(fft[k],-floor)*(1/floor)+1;
+						k++;
+					}
+					bins[i]/=n;
+					n*=2;
 				}
-				n*=2;
+				time+=mean(bins);//bins[0];
+				
+				if(sum(bins)>0)
+					console.log(bins);
 			}
-			sync+=freq[0];
 			
-			console.log(freq);
-			
-			gl.uniform2f(program.origin, origin, origin);
-			gl.uniform1f(program.gridSize, gridSize);
-			gl.uniform1f(program.density, density);
-			//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
-			gl.uniform4f(program.harmonic, freq[1], freq[2], freq[3], freq[4]);
-			gl.uniform1f(program.sync, sync);
+			gl.uniform4f(program.b0, bins[0], bins[1], bins[2], bins[3]);
+			gl.uniform4f(program.b1, bins[4], bins[5], bins[6], bins[7]);
+			gl.uniform1f(program.time, time);
 			
 			gl.viewport(0, 0, viewportWidth, viewportHeight);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

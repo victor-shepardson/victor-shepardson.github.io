@@ -8,11 +8,9 @@ precision mediump float;
 
 varying vec2 vTextureCoordinates;
 
-uniform float gridSize; //side length of square grid used for evaluation
-uniform float density; //number of impulses / kernel area (accuracy)
-uniform vec2 origin; //offset of image space from texture space
-uniform float sync; //nonrandomness of phase
-uniform vec4 harmonic; //annular sector in frequency domain: min freq, max freq, min orientation, max orientation
+uniform float time; //nonrandomness of phase
+uniform vec4 b0;
+uniform vec4 b1;
 uniform vec2 mouse;
 
 //
@@ -180,20 +178,23 @@ void main(void){
 	vec2 delta = .01*(gl_FragCoord.xy - mouse);
 	float env = sqrt(delta.x*delta.x+delta.y*delta.y);
 	
-	vec3 pos = vec3(.05*delta, .01*sync);
+	vec3 pos = vec3(.125*delta, .01*time);
 	
 	float w = 4.;
 	
 	float value = 
-		sin(4.*env-.4*sync
-			+ w*harmonic.x*snoise( pos 
-				+ .9*w*harmonic.y*snoise( 2.*pos 
-					+ .8*w*harmonic.z*snoise( 4.*pos
-						+ .7*w*harmonic.w*snoise( 8.*pos
-							)))));
-	
+		sin(4.*env - .4*time + w*(
+			+ b0.x*snoise( pos )
+			+ .5*b0.y*snoise( 2.*pos ) 
+			+ 1.*b0.z*snoise( 4.*pos )
+			+ 1.*b0.w*snoise( 8.*pos )
+			+ 1.*b1.x*snoise( 16.*pos )
+			+ 2.*b1.y*snoise( 32.*pos )
+			+ 3.*b1.z*snoise( 64.*pos )
+			+ 4.*b1.w*snoise( 128.*pos )
+			));
 	//normalize / clamp
-	value = .5*value +.5;
+	value = .4*value +.5;
 	
 	//monochrome
 	vec3 c = vec3(value,value,value);
