@@ -35,7 +35,7 @@ Audio Visualizer with WebGL & WebAudio
 		console.log('loading audio');
 		var buffers = null;
 		var fftNodes = null;
-		var bufferLoader = new BufferLoader(context, ['./sample.ogg', './sweep.mp3'], function(bufferList){
+		var bufferLoader = new BufferLoader(context, ['./sawhammerwalk.ogg', './lampclink.ogg'], function(bufferList){
 			buffers = bufferList;
 			console.log(buffers);
 			fftNodes = new Array(buffers.length);
@@ -263,11 +263,11 @@ Audio Visualizer with WebGL & WebAudio
 
 		function frame() {
 			var floor = sliders[0].val()*80+50;
-			var magnitude = sliders[1].val()*16;
-			var scale = sliders[2].val()*1;
-			var nspeed = sliders[3].val()*.05;
+			var magnitude = sliders[1].val()*.8;
+			var scale = sliders[2].val()*1.5;
+			var nspeed = sliders[3].val()*.02;
 			var hspeed = sliders[4].val()*2.;
-			var harmonic = sliders[5].val(); harmonic = harmonic*harmonic*64.;
+			var harmonic = sliders[5].val()*16.;
 			var spread = sliders[6].val();
 			var b0 = new Float32Array(4*maxSources);
 			var b1 = new Float32Array(4*maxSources);
