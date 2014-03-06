@@ -4,20 +4,22 @@
 precision mediump float;
 #endif
 
+#define EPSILON .001
 #define PI 3.1415926535897932384626
+#define MAX_SOURCES 2
 
 varying vec2 vTextureCoordinates;
 
-uniform float time;
-uniform vec4 b0;
-uniform vec4 b1;
+uniform float time[MAX_SOURCES];
+uniform vec4 b0[MAX_SOURCES];
+uniform vec4 b1[MAX_SOURCES];
 uniform float nspeed;
 uniform float hspeed;
 uniform float magnitude;
 uniform float scale;
 uniform float harmonic;
 uniform float spread;
-uniform vec2 mouse;
+uniform vec2 mouse[MAX_SOURCES];
 
 //simplex noise from:
 	//
@@ -179,40 +181,81 @@ float snoise(vec2 v){
   return 130.0 * dot(m, g);
 }*/
 
-float vis(float t){
-	vec2 delta = (1./512.)*(gl_FragCoord.xy - mouse);
-	float env = sqrt(delta.x*delta.x+delta.y*delta.y);
-	
-	vec3 pos = vec3(scale*delta, nspeed*t);
-	
-	float w = magnitude;
-	
-	vec4 b = b0+b1;
-	float sum = b.x+b.y+b.z+b.w;
-	
-	float value = 
-		sin(harmonic*env - hspeed*t + w*(
-			+ .5*b0.x*snoise( pos )
-			+ .66*b0.y*snoise( 2.*pos ) 
-			+ .75*b0.z*snoise( 4.*pos )
-			+ 1.*b0.w*snoise( 8.*pos )
-			+ 1.125*b1.x*snoise( 16.*pos )
-			+ 1.25*b1.y*snoise( 32.*pos )
-			+ 1.5*b1.z*snoise( 64.*pos )
-			+ 2.*b1.w*snoise( 128.*pos )
-			));
-	//normalize / clamp
-	value = .4*value +.5;
-	value*=.66*sum;
+float aura(vec2 pos){
+	float value = 0.;
+	for(int i=0; i<MAX_SOURCES; i++){
+		vec2 delta = (1./512.)*(pos - mouse[i]);
+		float dist = sqrt(delta.x*delta.x+delta.y*delta.y);
+		float env = /*sum*/exp(-10.*dist);
+		value += env;
+	}
 	return value;
+}
+
+float vis(float t){
+// TODO: move in a circle
+	vec3 pos = vec3(scale*(1./512.)*gl_FragCoord.xy, t);
+	
+	vec4 w0 = magnitude*vec4(
+		.5*snoise( pos ),
+		.66*snoise( 2.*pos ), 
+		.75*snoise( 4.*pos ),
+		1.*snoise( 8.*pos )
+		);
+	vec4 w1 = magnitude*vec4(
+		1.125*snoise( 16.*pos ),
+		1.25*snoise( 32.*pos ),
+		1.5*snoise( 64.*pos ),
+		2.*snoise( 128.*pos )
+		);
+	
+	float value = 0.;
+	
+	for(int i=0; i<MAX_SOURCES; i++){
+		vec4 b = b0[i]+b1[i];
+		float sum = b.x+b.y+b.z+b.w;
+			
+		vec4 s0 = w0*b0[i];
+		vec4 s1 = w1*b1[i];
+		vec4 s = s0+s1;
+		float warp = s.x+s.y+s.z+s.w;
+		
+		vec2 delta = (1./512.)*(gl_FragCoord.xy - mouse[i]);
+		float dist = sqrt(delta.x*delta.x+delta.y*delta.y);
+		float env = exp(-10.*dist);
+		value += sum*exp(-10.*(dist+abs(env*warp)));//.5*env*(1.+sin(harmonic*dist - hspeed*t + warp));
+	}
+
+	return value;//aura(gl_FragCoord.xy+vec2(value, value));
 }
 
 void main(void){
 	//compute positions for this fragment
-
-	float r = vis(time-spread*(1.+sin(.13*hspeed*time)));
-	float g = vis(time);
-	float b = vis(time+spread*(1.+sin(.11*hspeed*time)));
+	float t = 0.;
+	//interpolate times between positions
+	float norm = EPSILON;
+	for(int i=0; i<MAX_SOURCES; i++){
+		vec2 delta = (1./512.)*(gl_FragCoord.xy - mouse[i]);
+		float dist = sqrt(delta.x*delta.x+delta.y*delta.y);
+		float env = /*exp(-10.*dist);*/1./(dist+EPSILON);
+		t += env * fract(nspeed*time[i]);
+		norm += env;
+	} t /= norm;
+	//select nearest
+/*	float mind = 99.;
+	for(int i=0; i<MAX_SOURCES; i++){
+		vec2 delta = (1./512.)*(gl_FragCoord.xy - mouse[i]);
+		float dist = sqrt(delta.x*delta.x+delta.y*delta.y);
+		if (dist<mind){
+			t = time[i];
+			mind=dist;
+		}
+	}*/
+	//t=time[0];
+	
+	float r = vis(t);
+	float g = r;//vis(time-spread*(1.+sin(.13*hspeed*time)));
+	float b = r;//vis(time+spread*(1.+sin(.11*hspeed*time)));
 	
 	//monochrome
 	vec3 c = vec3(r,g,b);

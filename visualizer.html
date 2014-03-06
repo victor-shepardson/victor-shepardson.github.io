@@ -15,7 +15,11 @@ Audio Visualizer with WebGL & WebAudio
 <script src="./buffer-loader.js"></script>
 <script>
 	window.onload = function() {
-		var time = 0;
+		var maxSources = 2;
+		var fftSize = 512;
+		
+		var mouse = [0,0];
+		var time = new Float32Array(maxSources);
 		//init audio stuff
 		console.log('init audio...')
 		var context;
@@ -29,21 +33,25 @@ Audio Visualizer with WebGL & WebAudio
 		}
 		//load audio
 		console.log('loading audio');
-		var inputBuffer = null;
-		var bufferLoader = new BufferLoader(context, ['./sample.ogg'], function(bufferList){
-			inputBuffer = bufferList[0];
-			console.log(inputBuffer);
-			playSound(inputBuffer);
+		var buffers = null;
+		var fftNodes = null;
+		var bufferLoader = new BufferLoader(context, ['./sample.ogg', './sweep.mp3'], function(bufferList){
+			buffers = bufferList;
+			console.log(buffers);
+			fftNodes = new Array(buffers.length);
+			for(var i=0; i<buffers.length; i++){
+				fftNodes[i] = context.createAnalyser();
+				fftNodes[i].fftSize = fftSize;
+				time[i] = 0;
+				playSound(buffers, i);
+			}
 		});
 		bufferLoader.load();
-		var fftNode = context.createAnalyser();
-		fftNode.fftSize=512;
-		fft = new Float32Array(fftNode.frequencyBinCount);
-		function playSound(buffer) {
+		function playSound(buffers, i) {
 			var source = context.createBufferSource(); // creates a sound source
-			source.loop=true;
-			source.buffer = buffer;                    // tell the source which sound to play
-			source.connect(fftNode);
+			source.loop=true;							//loop
+			source.buffer = buffers[i];                    // tell the source which sound to play
+			source.connect(fftNodes[i]);				//connect to analyser
 			source.connect(context.destination);       // connect the source to the context's destination (the speakers)
 			source.start(0);                           // play the source now
 		}
@@ -137,10 +145,8 @@ Audio Visualizer with WebGL & WebAudio
 			//event.preventDefault();
 			//get pixel position in canvas to pass to shader
 			var os = $('#canvas').offset()
-			var x = event.pageX-os.left;
-			var y = viewportHeight - (event.pageY-os.top);
-			//console.log(x); console.log(y);
-			gl.uniform2f(program.mouse, x, y);
+			mouse[0] = event.pageX-os.left;
+			mouse[1] = viewportHeight - (event.pageY-os.top);
 		});
 /*
 		$(document).mousedown( function(event) {
@@ -263,43 +269,47 @@ Audio Visualizer with WebGL & WebAudio
 			var hspeed = sliders[4].val()*2.;
 			var harmonic = sliders[5].val(); harmonic = harmonic*harmonic*64.;
 			var spread = sliders[6].val();
-			var bins = [0,0,0,0,0,0,0,0];
-			if(inputBuffer){
-			
-				fftNode.getFloatFrequencyData(fft);
-				//console.log(fft);
-				
-				var n = 1;
-				var k = 0;
-				for(var i=0;i<bins.length;i++){
-					for(var j=0; j<n; j++){
-						if(k==fft.length){
-							console.log(k);
-							break;
+			var b0 = new Float32Array(4*maxSources);
+			var b1 = new Float32Array(4*maxSources);
+			if(buffers){
+				//for sources
+				for(var s=0; s<buffers.length; s++){
+					var bins = [0,0,0,0,0,0,0,0];
+					fft = new Float32Array(fftNodes[s].frequencyBinCount);
+					fftNodes[s].getFloatFrequencyData(fft);
+					
+					var n = 1;
+					var k = 0;
+					for(var b=0;b<bins.length;b++){
+						for(var j=0; j<n; j++){
+							if(k==fft.length){
+								console.log(k);
+								break;
+							}
+							bins[b] += Math.max(fft[k],-floor)*(1/floor)+1;
+							k++;
 						}
-						bins[i] += Math.max(fft[k],-floor)*(1/floor)+1;
-						k++;
+						bins[b]/=n;
+						//bins[i]*=bins[i];
+						if(b<4) b0[s*4+b] = bins[b];
+						else b1[s*4+(b-4)] = bins[b]; 
+						
+						n*=2;
 					}
-					bins[i]/=n;
-					//bins[i]*=bins[i];
-					n*=2;
+					time[s]+=mean(bins);
 				}
-				time+=mean(bins);//bins[0];
-				
-				if(max(bins)>1)
-					console.log(bins);
 			}
-
 			
-			gl.uniform4f(program.b0, bins[0], bins[1], bins[2], bins[3]);
-			gl.uniform4f(program.b1, bins[4], bins[5], bins[6], bins[7]);
-			gl.uniform1f(program.time, time);
+			gl.uniform4fv(program.b0, b0);
+			gl.uniform4fv(program.b1, b1);
+			gl.uniform1fv(program.time, time);
 			gl.uniform1f(program.nspeed, nspeed);
 			gl.uniform1f(program.hspeed, hspeed);
 			gl.uniform1f(program.scale, scale);
 			gl.uniform1f(program.magnitude, magnitude);
 			gl.uniform1f(program.harmonic, harmonic);
 			gl.uniform1f(program.spread, spread);
+			gl.uniform2fv(program.mouse, new Float32Array([mouse[0], mouse[1], 100, 100]));
 
 			gl.viewport(0, 0, viewportWidth, viewportHeight);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
