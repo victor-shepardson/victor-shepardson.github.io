@@ -35,7 +35,7 @@ Audio Visualizer with WebGL & WebAudio
 		console.log('loading audio');
 		var buffers = null;
 		var fftNodes = null;
-		var bufferLoader = new BufferLoader(context, ['./sweep.mp3', './lampclink.ogg'], function(bufferList){
+		var bufferLoader = new BufferLoader(context, ['./sample.ogg', './lampclink.ogg'], function(bufferList){
 			buffers = bufferList;
 			console.log(buffers);
 			fftNodes = new Array(buffers.length);

@@ -12,11 +12,22 @@
 	</tr>
 </table>
 <script src="./jquery-1.11.0.js"></script>
-<!--><script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><!-->
-<script>
-	console.log('starting...')
-	loadShaders();
-	var viewportWidth=512, viewportHeight=512;
+<script src="./vshader.glsl.js"></script>
+<script src="./noise2.glsl.js"></script>
+<script> window.onload = function(){
+	console.log('onload...')
+	var vshader = genshader_vshader;
+	var fshader = genshader_noise2;
+	var near = 1;
+	var far = 100;
+	var top,bottom,left,right;
+	top=right=1;
+	left=bottom=-1;
+	var mat_a = (right+left)/(right-left);
+	var mat_b = (top+bottom)/(top-bottom);
+	var mat_c = (far+near)/(far-near);
+	var mat_d = 2*far*near/(far-near);
+	var viewportWidth=1024, viewportHeight=512;
 	var sliderh = 100;
 	var numsliders = 5;
 	var slider_names = ['frequency','isotropy','orientation','density','gridsize'];
@@ -51,10 +62,10 @@
 	var vertexPositionsBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
 	var vertexPositions = [
-		1.0, 1.0, 0.0,
-		-1.0, 1.0, 0.0,
-		1.0, -1.0, 0.0,
-		-1.0, -1.0, 0.0
+		far, -near, -far,
+		-far, -near, -far,
+		far, -near, near,
+		-far, -near, near
 	];
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
@@ -80,6 +91,7 @@
 	gl.useProgram(program);
 
 	frame();
+	
 /*	
 	$(document).keydown( function(event) {
 		event.preventDefault();
@@ -118,28 +130,6 @@
 		gl.uniform2f(program.mouseUniform, 0, 0);
 	});
 */
-	var vshader, fshader;
-	function loadShaders(){
-		console.log("loading shaders...");
-		$.ajax({
-			url: './vshader.glsl',
-			success: function(result) {
-				vshader = result;
-				console.log('vertex shader...');
-			},
-			async: false
-		});
-		$.ajax({
-			url: './noise.glsl',
-			success: function(result) {
-				fshader = result;
-				console.log('fragment shader...');
-            },
-			async: false
-		});
-		while(!vshader || !fshader) {}
-		console.log('loaded');
-	}
 	
 	function createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer) {
 		// create vertex shader
@@ -175,6 +165,7 @@
 		program.textureCoordinatesAttribute = gl.getAttribLocation(program, "aTextureCoordinates");
 		gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
 
+		program.projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
 		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
@@ -184,17 +175,28 @@
 	}
 
 	function frame() {
-		origin+=1.;
 		var gridSize = sliders[4].val()*128.+1.;
 		var density = sliders[3].val()*50.;
-		var freq = sliders[0].val()*.25;
+		var freq = sliders[0].val()*1.+.01;
 		var orientation = sliders[2].val()*2.*3.14;
 		var isotropy = sliders[1].val()*.5*3.14;
+		origin+=.1/freq;
 		gl.uniform2f(program.origin, 0., origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
 		//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
 		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
+		
+		gl.uniformMatrix4fv(program.projectionMatrix, false, [
+		/*	2*near/(right-left), 0, mat_a, 0,
+			0, 2*near/(top-bottom), mat_b, 0,
+			0, 0, mat_c, mat_d,
+			0, 0, -1, 0*/
+			2*near/(right-left), 0, 0, 0,
+			0, 2*near/(top-bottom), 0, 0,
+			mat_a, mat_b, mat_c, -1,
+			0, 0, mat_d, 0
+			]);
 		
 		gl.viewport(0, 0, viewportWidth, viewportHeight);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -208,6 +210,6 @@
 		
 		window.requestAnimationFrame(frame, gl);
 	}
-</script>
+}</script>
 </body>
 </html>

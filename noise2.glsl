@@ -77,7 +77,7 @@ float eval_impulse(inout float u, in vec2 delta){
  }
 void main(void){
 	//compute positions for this fragment
-	pos = vTextureCoordinates.xy+origin.xy;
+	pos = 512.*vTextureCoordinates.xy+origin.xy;
 	vec2 temp = pos/gridSize; 
 	cpos = fract(temp);
 	gpos = ivec2(floor(temp));
