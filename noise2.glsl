@@ -18,6 +18,7 @@ uniform float density; //number of impulses / kernel area (accuracy)
 uniform vec2 origin; //offset of image space from texture space
 uniform float sync; //nonrandomness of phase
 uniform vec4 harmonic; //annular sector in frequency domain: min freq, max freq, min orientation, max orientation
+uniform float filterSigma; //sigma for anisotropic filtering
 
 vec2 pos; //fragment position in image space, measured in pixels
 vec2 cpos; //fragment position in cell space: continuous in [0, 1]
@@ -52,10 +53,10 @@ float eval_impulse(inout float u, in vec2 delta){
 	float ifreq = mix(harmonic.x, harmonic.y, nextRand(u)); 
 	float iorientation = mix(harmonic.z, harmonic.w, nextRand(u));
 	//evaluate kernel, accumulate fragment value
-	vec2 omega = vec2(cos(iorientation), sin(iorientation));
+	vec2 mu = ifreq*vec2(cos(iorientation), sin(iorientation));
 	float phi = nextRand(u); //phase - uniform dist [0, 1]
-	float k_prime = a_prime_square/(a*a)*exp(-.5*dot(omega, sigma_f_plus_g_inv*omega));
-	return k_prime*(exp(dot(delta,delta)*-PI)*cos(2.*PI*(ifreq*gridSize*dot(delta, filter*omega)+phi)));
+	float k_prime = a_prime_square/(a*a)*exp(-.5*dot(mu, sigma_f_plus_g_inv*mu));
+	return k_prime*exp(-PI*a_prime_square*dot(delta,delta))*cos(2.*PI*(dot(delta, filter*mu)+phi));
 	//e ^ -(disp^2 / 2*sigma^2)
 }
 
@@ -72,7 +73,7 @@ float eval_impulse(inout float u, in vec2 delta){
 			//position of impulse in cell space - uniform distribution
 			vec2 ipos = vec2(nextRand(u), nextRand(u));
 			//displacement to fragment
-			vec2 delta = (cpos - ipos - vec2(dnbr));//*gridSize;
+			vec2 delta = (cpos - ipos - vec2(dnbr))*gridSize;
 			acc += eval_impulse(u, delta);
 		}
 	}
@@ -85,7 +86,6 @@ float eval_impulse(inout float u, in vec2 delta){
  mat2 inv2x2(mat2 m){
 	return (1./det2x2(m))*mat2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
  }
- 
  mat2 id2x2(){
 	return mat2(1.,0.,0.,1.);
  }
@@ -98,11 +98,10 @@ void main(void){
 	gpos = ivec2(floor(temp));
 	
 	a = 1./gridSize;
-	float sigma = a;
 	
 	mat2 jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
 	mat2 jacob_t = mat2(jacob[0][0], jacob[1][0], jacob[0][1], jacob[1][1]);
-	mat2 sigma_f_inv = (4.*PI*PI*sigma*sigma)*(jacob*jacob_t);
+	mat2 sigma_f_inv = (4.*PI*PI*filterSigma*filterSigma)*(jacob*jacob_t);
 	mat2 sigma_f = inv2x2(sigma_f_inv);
 	mat2 sigma_g_inv = (2.*PI/(a*a))* id2x2();
 	mat2 sigma_g = inv2x2(sigma_g_inv);

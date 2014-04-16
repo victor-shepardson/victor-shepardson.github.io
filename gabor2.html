@@ -29,9 +29,16 @@
 	var mat_d = 2*far*near/(far-near);
 	var viewportWidth=1024, viewportHeight=512;
 	var sliderh = 100;
-	var numsliders = 5;
-	var slider_names = ['frequency','isotropy','orientation','density','gridsize'];
-	var slider_text = ["'frequency of noise in pixels'", "'directionality of noise'", "'direction of noise; no effect if isotropy is high'", "'density of impulses/cell for evaluation; trades off performance for accuracy'", "'size of evaluation grid in pixels; controls bandwidth of noise'"];
+	var numsliders = 6;
+	var slider_names = ['frequency','isotropy','orientation','density','gridsize','filter sigma'];
+	var slider_text = [
+		"'frequency of noise in pixels'",
+		"'directionality of noise'",
+		"'direction of noise; no effect if isotropy is high'",
+		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
+		"'size of evaluation grid in pixels; controls bandwidth of noise'",
+		"'width of gaussian for anisotropic filtering'"
+		];
 	var sliders = [];
 	var origin=0.;
 	for(var i=0; i<numsliders; i++){
@@ -172,6 +179,7 @@
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
 		program.origin = gl.getUniformLocation(program, "origin");
+		program.filterSigma = gl.getUniformLocation(program, "filterSigma");
 	
 		return program;
 	}
@@ -179,16 +187,17 @@
 	function frame() {
 		var gridSize = sliders[4].val()*.1+.001;
 		var density = sliders[3].val()*50.;
-		var freq = sliders[0].val()*512.+.01;
+		var freq = sliders[0].val()*1024.+1.;
 		var orientation = sliders[2].val()*2.*3.14;
 		var isotropy = sliders[1].val()*.5*3.14;
+		var filterSigma = sliders[5].val()*2.;
 		origin+=.1/freq;
 		gl.uniform2f(program.origin, 0., origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
 		//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
 		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
-		
+		gl.uniform1f(program.filterSigma, filterSigma);
 		gl.uniformMatrix4fv(program.projectionMatrix, false, [
 		/*	2*near/(right-left), 0, mat_a, 0,
 			0, 2*near/(top-bottom), mat_b, 0,
