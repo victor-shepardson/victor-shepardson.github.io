@@ -55,6 +55,8 @@
 		.attr('height', viewportHeight)[0]
 		.getContext('experimental-webgl');
 		
+	gl.getExtension('OES_standard_derivatives');	
+		
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 
@@ -175,9 +177,9 @@
 	}
 
 	function frame() {
-		var gridSize = sliders[4].val()*128.+1.;
+		var gridSize = sliders[4].val()*.1+.001;
 		var density = sliders[3].val()*50.;
-		var freq = sliders[0].val()*1.+.01;
+		var freq = sliders[0].val()*512.+.01;
 		var orientation = sliders[2].val()*2.*3.14;
 		var isotropy = sliders[1].val()*.5*3.14;
 		origin+=.1/freq;

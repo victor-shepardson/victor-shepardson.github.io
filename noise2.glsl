@@ -1,4 +1,4 @@
-#version 100
+#extension GL_OES_standard_derivatives : enable
 
 #ifdef GL_ES
 precision mediump float;
@@ -22,6 +22,8 @@ uniform vec4 harmonic; //annular sector in frequency domain: min freq, max freq,
 vec2 pos; //fragment position in image space, measured in pixels
 vec2 cpos; //fragment position in cell space: continuous in [0, 1]
 ivec2 gpos; //cell position in grid space: integer in [-inf, inf]
+mat2 filter, sigma_f_plus_g_inv;
+float a, a_prime_square;
 
 float lambda = density/PI; //mean impulses per grid cell
 
@@ -52,7 +54,8 @@ float eval_impulse(inout float u, in vec2 delta){
 	//evaluate kernel, accumulate fragment value
 	vec2 omega = vec2(cos(iorientation), sin(iorientation));
 	float phi = nextRand(u); //phase - uniform dist [0, 1]
-	return (exp(dot(delta,delta)*-PI)*cos(2.*PI*(ifreq*gridSize*dot(delta, omega)+phi)));
+	float k_prime = a_prime_square/(a*a)*exp(-.5*dot(omega, sigma_f_plus_g_inv*omega));
+	return k_prime*(exp(dot(delta,delta)*-PI)*cos(2.*PI*(ifreq*gridSize*dot(delta, filter*omega)+phi)));
 	//e ^ -(disp^2 / 2*sigma^2)
 }
 
@@ -75,12 +78,42 @@ float eval_impulse(inout float u, in vec2 delta){
 	}
 	return acc;
  }
+ 
+ float det2x2(mat2 m){
+	return (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
+ }
+ mat2 inv2x2(mat2 m){
+	return (1./det2x2(m))*mat2(m[1][1], -m[0][1], -m[1][0], m[0][0]);
+ }
+ 
+ mat2 id2x2(){
+	return mat2(1.,0.,0.,1.);
+ }
+ 
 void main(void){
 	//compute positions for this fragment
-	pos = 512.*vTextureCoordinates.xy+origin.xy;
+	pos = vTextureCoordinates.xy+origin.xy;
 	vec2 temp = pos/gridSize; 
 	cpos = fract(temp);
 	gpos = ivec2(floor(temp));
+	
+	a = 1./gridSize;
+	float sigma = a;
+	
+	mat2 jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
+	mat2 jacob_t = mat2(jacob[0][0], jacob[1][0], jacob[0][1], jacob[1][1]);
+	mat2 sigma_f_inv = (4.*PI*PI*sigma*sigma)*(jacob*jacob_t);
+	mat2 sigma_f = inv2x2(sigma_f_inv);
+	mat2 sigma_g_inv = (2.*PI/(a*a))* id2x2();
+	mat2 sigma_g = inv2x2(sigma_g_inv);
+	mat2 sigma_fg_inv = sigma_f_inv + sigma_g_inv;
+	mat2 sigma_fg = inv2x2(sigma_fg_inv);
+	
+	filter = sigma_fg * sigma_g_inv;	
+	sigma_f_plus_g_inv = inv2x2(sigma_f + sigma_g);
+	
+	a_prime_square = 2.*PI*sqrt(det2x2(sigma_fg));
+	
 	
 	float value = 
 		eval_cell(ivec2(-1, -1)) +
@@ -98,7 +131,7 @@ void main(void){
 	value= value*.5+.5;
 	
 	//monochrome
-	vec3 c = vec3(value,value,value);
+	vec3 c = vec3(value,value,value);//.5*vec3(a_prime_square/(a*a));
 	//draw fragment
 	gl_FragColor = vec4(c, 1.0);
 }
