@@ -11,7 +11,7 @@ precision mediump float;
 #define C2 4011.
 
 varying vec2 vTextureCoordinates;
-varying vec2 position;
+varying vec3 position;
 
 uniform float gridSize; //side length of square grid used for evaluation
 uniform float density; //number of impulses / kernel area (accuracy)

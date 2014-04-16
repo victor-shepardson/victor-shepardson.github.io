@@ -18,15 +18,6 @@
 	console.log('onload...')
 	var vshader = genshader_vshader;
 	var fshader = genshader_noise2;
-	var near = 1;
-	var far = 100;
-	var top,bottom,left,right;
-	top=right=1;
-	left=bottom=-1;
-	var mat_a = (right+left)/(right-left);
-	var mat_b = (top+bottom)/(top-bottom);
-	var mat_c = (far+near)/(far-near);
-	var mat_d = 2*far*near/(far-near);
 	var viewportWidth=1024, viewportHeight=512;
 	var sliderh = 100;
 	var numsliders = 6;
@@ -71,10 +62,10 @@
 	var vertexPositionsBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
 	var vertexPositions = [
-		far, -near, -far,
-		-far, -near, -far,
-		far, -near, near,
-		-far, -near, near
+		-.5, -.5, -1,
+		.5, -.5, -1,
+		-.5, .5, -1,
+		.5, .5, -1
 	];
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
@@ -83,8 +74,8 @@
 	
 	var textureCoordinatesBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
-	var s = viewportWidth/512.0;
-	var t = viewportHeight/512.0;
+	var s = viewportWidth/Math.min(viewportWidth, viewportHeight);
+	var t = viewportHeight/Math.min(viewportWidth, viewportHeight);
 	var textureCoordinates = [
 		s, 1.0,
 		0.0, 1.0,
@@ -175,6 +166,7 @@
 		gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
 
 		program.projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
+		program.modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
 		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
@@ -184,6 +176,51 @@
 		return program;
 	}
 
+	function setProjectionMatrix(near, far, top, bottom, left, right){
+		var mat_a = (right+left)/(right-left);
+		var mat_b = (top+bottom)/(top-bottom);
+		var mat_c = (far+near)/(far-near);
+		var mat_d = 2*far*near/(far-near);
+		gl.uniformMatrix4fv(program.projectionMatrix, false, [
+			2*near/(right-left), 0, 0, 0,
+			0, 2*near/(top-bottom), 0, 0,
+			mat_a, mat_b, mat_c, -1,
+			0, 0, mat_d, 0
+			]);
+	}
+	
+	function setEye(ex, ey, ez){
+		var upx = 0; var upy = 1; var upz = 0;
+		var em = Math.sqrt(ex*ex+ey*ey+ez*ez);
+		ex/=-em; ey/=-em; ez/=-em;
+		var sx = ey*upz-ez*upy;
+		var sy = ex*upz-ez*upx;
+		var sz = ex*upy-ey*upx;
+		var sm = Math.sqrt(sx*sx+sy*sy+sz*sz);
+		var ux = (sy*ez-sz*ey)/sm;
+		var uy = (sx*ez-sz*ex)/sm;
+		var uz = (sx*ey-sy*ex)/sm;
+		gl.uniformMatrix4fv(program.modelViewMatrix, false, [
+			sx, sy, sz, 0,
+			ux, uy, uz, 0,
+			-ex, -ey, -ez, 0,
+			0, 0, 0, 1
+			]);
+	}
+	
+	function setRotation(ax, ay, az, theta){
+		var am = Math.sqrt(ax*ax+ay*ay+az*az);
+		ax/=am; ay/=am; az/=am;
+		var c = Math.cos(theta);
+		var s = Math.sin(theta);
+		gl.uniformMatrix4fv(program.modelViewMatrix, false, [
+			ax*ax*(1-c)+c, ax*ay*(1-c)-az*s, ax*az*(1-c)+ay*s, 0,
+			ay*ax*(1-c)+az*s, ay*ay*(1-c)+c, ay*az*(1-c)-ax*s, 0,
+			ax*az*(1-c)-ay*s, ay*az*(1-c)+ax*s, az*az*(1-c)+c, 0,
+			0, 0, 0, 1
+			]);
+	}
+	
 	function frame() {
 		var gridSize = sliders[4].val()*.1+.001;
 		var density = sliders[3].val()*50.;
@@ -195,19 +232,10 @@
 		gl.uniform2f(program.origin, 0., origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
-		//console.log('gridsize = '+gridSize+'; density = '+density+'; freq = '+freq+'; orientation = '+orientation+'; isotropy = '+isotropy);
 		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
 		gl.uniform1f(program.filterSigma, filterSigma);
-		gl.uniformMatrix4fv(program.projectionMatrix, false, [
-		/*	2*near/(right-left), 0, mat_a, 0,
-			0, 2*near/(top-bottom), mat_b, 0,
-			0, 0, mat_c, mat_d,
-			0, 0, -1, 0*/
-			2*near/(right-left), 0, 0, 0,
-			0, 2*near/(top-bottom), 0, 0,
-			mat_a, mat_b, mat_c, -1,
-			0, 0, mat_d, 0
-			]);
+		setProjectionMatrix(.5,2,1,-1,-1,1);
+		setRotation(1,0,0,filterSigma);
 		
 		gl.viewport(0, 0, viewportWidth, viewportHeight);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
