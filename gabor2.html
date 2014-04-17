@@ -12,26 +12,29 @@
 	</tr>
 </table>
 <script src="./jquery-1.11.0.js"></script>
+<script src="./gl-matrix-min.js"></script>
 <script src="./vshader.glsl.js"></script>
 <script src="./noise2.glsl.js"></script>
 <script> window.onload = function(){
 	console.log('onload...')
+	glMatrix.setMatrixArrayType(Array);
 	var vshader = genshader_vshader;
 	var fshader = genshader_noise2;
-	var viewportWidth=1024, viewportHeight=512;
+	var viewportWidth=512, viewportHeight=512;
 	var sliderh = 100;
 	var numsliders = 6;
-	var slider_names = ['frequency','isotropy','orientation','density','gridsize','filter sigma'];
+	var slider_names = ['frequency','isotropy','orientation','density','gridsize','plane rotation'];
 	var slider_text = [
 		"'frequency of noise in pixels'",
 		"'directionality of noise'",
 		"'direction of noise; no effect if isotropy is high'",
 		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
 		"'size of evaluation grid in pixels; controls bandwidth of noise'",
-		"'width of gaussian for anisotropic filtering'"
+		"'rotate the plane noise is drawn on'"
 		];
 	var sliders = [];
-	var origin=0.;
+	var origin=-.5;//0.;
+	var planeSize = 10;
 	for(var i=0; i<numsliders; i++){
 		var span = $('<span title='+slider_text[i]+'><\span>').appendTo($('#control'));
 		var div = $('<div>').appendTo(span);
@@ -53,7 +56,9 @@
 		.attr('height', viewportHeight)[0]
 		.getContext('experimental-webgl');
 		
+	console.log(gl.getSupportedExtensions());
 	gl.getExtension('OES_standard_derivatives');	
+	//gl.getExtension(GL_EXT_gpu_shader4);
 		
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
@@ -62,10 +67,10 @@
 	var vertexPositionsBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
 	var vertexPositions = [
-		-.5, -.5, -1,
-		.5, -.5, -1,
-		-.5, .5, -1,
-		.5, .5, -1
+		-planeSize, -planeSize, -1,
+		planeSize, -planeSize, -1,
+		-planeSize, planeSize, -1,
+		planeSize, planeSize, -1
 	];
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
@@ -91,45 +96,6 @@
 	gl.useProgram(program);
 
 	frame();
-	
-/*	
-	$(document).keydown( function(event) {
-		event.preventDefault();
-		var key = event.which;
-	});
-
-	$(document).mousemove( function(event) {
-		event.preventDefault();
-		// transforming cursor coordinates to [-1.0, 1.0] range
-		// [0,0] being in the left bottom corner to match the vertex coordinates
-		var x = (event.pageX / viewportWidth)*2.0 - 1.0;
-		var y = 0.0 - ((event.pageY / viewportHeight)*2.0 - 1.0);
-		//gl.uniform2f(program.mouseUniform, x, y);
-	});
-
-	$(document).mousedown( function(event) {
-		event.preventDefault();
-		var key = event.which;
-		var x = event.pageX;
-		var y = event.pageY;
-		if (key==1) {
-			gl.uniform1i(program.mouseLeftUniform, 1);
-		}
-	});
-
-	$(document).mouseup( function(event) {
-		event.preventDefault();
-		var key = event.which;
-		if (key==1) {
-			gl.uniform1i(program.mouseLeftUniform, 0);
-		}
-	});
-
-	$(document).mouseleave( function(event) {
-		event.preventDefault();
-		gl.uniform2f(program.mouseUniform, 0, 0);
-	});
-*/
 	
 	function createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer) {
 		// create vertex shader
@@ -171,71 +137,35 @@
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
 		program.origin = gl.getUniformLocation(program, "origin");
-		program.filterSigma = gl.getUniformLocation(program, "filterSigma");
 	
 		return program;
 	}
-
-	function setProjectionMatrix(near, far, top, bottom, left, right){
-		var mat_a = (right+left)/(right-left);
-		var mat_b = (top+bottom)/(top-bottom);
-		var mat_c = (far+near)/(far-near);
-		var mat_d = 2*far*near/(far-near);
-		gl.uniformMatrix4fv(program.projectionMatrix, false, [
-			2*near/(right-left), 0, 0, 0,
-			0, 2*near/(top-bottom), 0, 0,
-			mat_a, mat_b, mat_c, -1,
-			0, 0, mat_d, 0
-			]);
-	}
-	
-	function setEye(ex, ey, ez){
-		var upx = 0; var upy = 1; var upz = 0;
-		var em = Math.sqrt(ex*ex+ey*ey+ez*ez);
-		ex/=-em; ey/=-em; ez/=-em;
-		var sx = ey*upz-ez*upy;
-		var sy = ex*upz-ez*upx;
-		var sz = ex*upy-ey*upx;
-		var sm = Math.sqrt(sx*sx+sy*sy+sz*sz);
-		var ux = (sy*ez-sz*ey)/sm;
-		var uy = (sx*ez-sz*ex)/sm;
-		var uz = (sx*ey-sy*ex)/sm;
-		gl.uniformMatrix4fv(program.modelViewMatrix, false, [
-			sx, sy, sz, 0,
-			ux, uy, uz, 0,
-			-ex, -ey, -ez, 0,
-			0, 0, 0, 1
-			]);
-	}
-	
-	function setRotation(ax, ay, az, theta){
-		var am = Math.sqrt(ax*ax+ay*ay+az*az);
-		ax/=am; ay/=am; az/=am;
-		var c = Math.cos(theta);
-		var s = Math.sin(theta);
-		gl.uniformMatrix4fv(program.modelViewMatrix, false, [
-			ax*ax*(1-c)+c, ax*ay*(1-c)-az*s, ax*az*(1-c)+ay*s, 0,
-			ay*ax*(1-c)+az*s, ay*ay*(1-c)+c, ay*az*(1-c)-ax*s, 0,
-			ax*az*(1-c)-ay*s, ay*az*(1-c)+ax*s, az*az*(1-c)+c, 0,
-			0, 0, 0, 1
-			]);
-	}
 	
 	function frame() {
-		var gridSize = sliders[4].val()*.1+.001;
-		var density = sliders[3].val()*50.;
-		var freq = sliders[0].val()*1024.+1.;
+		var gridSize = sliders[4].val()*.1+1/512;
+		var density = sliders[3].val()*100.;
+		var freq = sliders[0].val()*512.+1.;
 		var orientation = sliders[2].val()*2.*3.14;
 		var isotropy = sliders[1].val()*.5*3.14;
-		var filterSigma = sliders[5].val()*2.;
-		origin+=.1/freq;
-		gl.uniform2f(program.origin, 0., origin);
+		var theta = sliders[5].val()*-.5*Math.PI;
+		origin+=.001;
+		gl.uniform2f(program.origin, 0, origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
 		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
-		gl.uniform1f(program.filterSigma, filterSigma);
-		setProjectionMatrix(.5,2,1,-1,-1,1);
-		setRotation(1,0,0,filterSigma);
+
+		var projectionMatrix = mat4.create();
+		mat4.frustum(projectionMatrix, -1, 1, -1, 1, 1, 100);
+		gl.uniformMatrix4fv(program.projectionMatrix, false, projectionMatrix);
+		
+		var mvMatrix = mat4.create();
+		var tr = vec3.fromValues(0,-1,-1);
+		var axis = vec3.fromValues(1,0,0);
+		mat4.translate(mvMatrix, mvMatrix, tr);
+		mat4.rotate(mvMatrix, mvMatrix, theta, axis);
+		vec3.negate(tr, tr);
+		mat4.translate(mvMatrix, mvMatrix, tr);
+		gl.uniformMatrix4fv(program.modelViewMatrix, false, mvMatrix);
 		
 		gl.viewport(0, 0, viewportWidth, viewportHeight);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

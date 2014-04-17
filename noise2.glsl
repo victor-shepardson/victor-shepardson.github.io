@@ -6,9 +6,7 @@ precision mediump float;
 
 #define PI 3.1415926535897932384626
 #define IMPULSE_CAP 100
-#define EPSILON .001
-#define C1 4099.
-#define C2 4011.
+#define IMOD 4096
 
 varying vec2 vTextureCoordinates;
 varying vec3 position;
@@ -18,34 +16,57 @@ uniform float density; //number of impulses / kernel area (accuracy)
 uniform vec2 origin; //offset of image space from texture space
 uniform float sync; //nonrandomness of phase
 uniform vec4 harmonic; //annular sector in frequency domain: min freq, max freq, min orientation, max orientation
-uniform float filterSigma; //sigma for anisotropic filtering
 
-vec2 pos; //fragment position in image space, measured in pixels
-vec2 cpos; //fragment position in cell space: continuous in [0, 1]
-ivec2 gpos; //cell position in grid space: integer in [-inf, inf]
 mat2 filter, sigma_f_plus_g_inv;
 float a, a_prime_square;
 
-float lambda = density/PI; //mean impulses per grid cell
+float lambda = density*(1./PI); //mean impulses per grid cell
 
-float norm = .33/log2(lambda+2.); //attempt to normalize color value
+ivec2 bound_grid(ivec2 gpos){
+	return gpos + IMOD*(1 - gpos/IMOD);
+}
 
+//hash based on Blum, Blum & Shub 1986
+//and Sharpe http://briansharpe.wordpress.com/2011/10/01/gpu-texture-free-noise/
+const float bbsm = 137023;//magic product of primes chosen to have high period without float precision issues
+vec4 bbsmod( vec4 a ) {
+	return a - floor( a * ( 1.0 / bbsm ) ) * bbsm;
+}
+vec4 bbs(vec4 a) {
+	return bbsmod(a*a);
+}
+vec4 bbsopt( vec4 a ) {
+	return fract( a * a * ( 1.0 / bbsm ) ) * bbsm;
+}
+float seed(in ivec2 p){
+	vec4 h = vec4(p.xy, p.xy+ivec2(1));
+	vec4 h0 = bbs(h);
+	vec4 h1 = bbsopt(h0.xzxz);
+	vec4 h2 = bbsopt(h0.yyww+h1);
+	//vec4 h3 = bbsopt(h0.xzxz+h2);
+	return h2.x*(1./bbsm);
+}
+
+//permutation polynomial
+//based on Gustavson/McEwan https://github.com/ashima/webgl-noise/
+//and Sharpe http://briansharpe.wordpress.com/2011/10/01/gpu-texture-free-noise/
+const float pp_epsilon = .01;
 float nextRand(inout float u){//rng
-    u = fract(C2*cos(u + C1 * cos(u)));
-	return u;
+	u = fract(((u*34.0*289.)+1.0)*u+pp_epsilon);
+	return fract(7.*u);
 }
-float seed(in vec2 p){
-	vec2 temp = p;
-	float temp2 = nextRand(temp.x) + temp.y;
-	return nextRand(temp2);
-}
- 
-int poisson(inout float u, in float m){//from Galerne, Lagae, Lefebvre, Drettakis
+
+//approximate poisson distribution uniform u
+//from Galerne, Lagae, Lefebvre, Drettakis
+const float poisson_epsilon = .001;
+int poisson(inout float u, in float m){
 	float u1 = nextRand(u);
 	float u2 = nextRand(u);
-	float x = sqrt(-2.*log(u1+EPSILON))*cos(2.*PI*u2);
+	float x = sqrt(-2.*log(u1+poisson_epsilon))*cos(2.*PI*u2);
 	return int(m+sqrt(m)*x+.5);
 }
+
+//Gabor noise based on Lagae, Lefebvre, Drettakis, Dutre 2011
 
 //evaluate the contribution to this fragment by a single impulse at displacement delta, in cell with seed u
 float eval_impulse(inout float u, in vec2 delta){
@@ -61,8 +82,9 @@ float eval_impulse(inout float u, in vec2 delta){
 }
 
 //evaluate the contribution to this fragment by impulses in the cell at displacement dnbr from this fragment's cell
- float eval_cell(in ivec2 dnbr){
-	float u = seed(vec2(gpos+dnbr)); //deterministic seed for nbr cell
+ float eval_cell(in vec2 cpos, in ivec2 gpos, in ivec2 dnbr){
+	float u = seed(bound_grid(gpos+dnbr)); //deterministic seed for nbr cell
+	//int u = seed(gpos+dnbr);
 	int impulses = poisson(u, lambda); //number of impulses in nbr cell
 	float acc = 0.;
 	//for impulses
@@ -92,12 +114,15 @@ float eval_impulse(inout float u, in vec2 delta){
  
 void main(void){
 	//compute positions for this fragment
-	pos = vTextureCoordinates.xy+origin.xy;
+	vec2 pos = vTextureCoordinates.xy+origin.xy;
 	vec2 temp = pos/gridSize; 
-	cpos = fract(temp);
-	gpos = ivec2(floor(temp));
+	vec2 cpos = fract(temp);
+	ivec2 gpos = bound_grid(ivec2(floor(temp)));
+	
+	float norm = .33/log2(lambda+2.); //attempt to normalize color value
 	
 	a = 1./gridSize;
+	float filterSigma = 1.;
 	
 	mat2 jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
 	mat2 jacob_t = mat2(jacob[0][0], jacob[1][0], jacob[0][1], jacob[1][1]);
@@ -112,18 +137,21 @@ void main(void){
 	sigma_f_plus_g_inv = inv2x2(sigma_f + sigma_g);
 	
 	a_prime_square = 2.*PI*sqrt(det2x2(sigma_fg));
-	
-	
+	/*
+	float u = seed(gpos);
+	float value = u;
+	value = nextRand(u);
+	*/
 	float value = 
-		eval_cell(ivec2(-1, -1)) +
-		eval_cell(ivec2(-1,  0)) +
-		eval_cell(ivec2(-1,  1)) +
-		eval_cell(ivec2( 0, -1)) +
-		eval_cell(ivec2( 0,  0)) +
-		eval_cell(ivec2( 0,  1)) +
-		eval_cell(ivec2( 1, -1)) +
-		eval_cell(ivec2( 1,  0)) +
-		eval_cell(ivec2( 1,  1));
+		eval_cell(cpos, gpos, ivec2(-1, -1)) +
+		eval_cell(cpos, gpos, ivec2(-1,  0)) +
+		eval_cell(cpos, gpos, ivec2(-1,  1)) +
+		eval_cell(cpos, gpos, ivec2( 0, -1)) +
+		eval_cell(cpos, gpos, ivec2( 0,  0)) +
+		eval_cell(cpos, gpos, ivec2( 0,  1)) +
+		eval_cell(cpos, gpos, ivec2( 1, -1)) +
+		eval_cell(cpos, gpos, ivec2( 1,  0)) +
+		eval_cell(cpos, gpos, ivec2( 1,  1));
 	
 	//normalize / clamp
 	value*=norm;
