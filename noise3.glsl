@@ -68,41 +68,36 @@ int poisson(inout float u, in float m){
 }
 
 //Gabor noise based on Lagae, Lefebvre, Drettakis, Dutre 2011
-
-//evaluate the contribution to this fragment by a single impulse at displacement delta, in cell with seed u
-float eval_impulse(inout float u, in vec2 delta, gnoise_params params){
-	vec4 h = params.harmonic;
-	float a = params.a;
-	float aps = params.a_prime_square;
-	//impulse frequency, orientation - uniform distribution on input ranges
-	float ifreq = mix(h.x, h.y, nextRand(u)); 
-	float iorientation = mix(h.z, h.w, nextRand(u));
-	//evaluate kernel, accumulate fragment value
-	vec2 mu = ifreq*vec2(cos(iorientation), sin(iorientation));
-	float phi = nextRand(u); //phase - uniform dist [0, 1]
-	float k_prime = aps/(a*a)*exp(-.5*dot(mu, params.sigma_f_plus_g_inv*mu));
-	return k_prime*exp(-PI*aps*dot(delta,delta))*cos(2.*PI*(dot(delta, params.filter*mu)+phi));
-}
-
-//evaluate the contribution to this fragment by impulses in the cell at displacement dnbr from this fragment's cell
- float eval_cell(in vec2 cpos, in ivec2 gpos, in ivec2 dnbr, gnoise_params params){
+  float eval_cell(in vec2 cpos, in ivec2 gpos, in ivec2 dnbr, gnoise_params params){
 	float u = seed(bound_grid(gpos+dnbr)); //deterministic seed for nbr cell
 	int impulses = poisson(u, params.lambda); //number of impulses in nbr cell
+	vec4 h = params.harmonic; //annular sector
+	float a = params.a; //bandwidth
+	float aps = params.a_prime_square; //intermediate calculations for filtering
+	float filt_scale = aps/(a*a);
+	vec2 fpos = cpos - vec2(dnbr);//fragment position in cell space
+	
 	float acc = 0.;
 	//for impulses
 	for(int k=0; k<IMPULSE_CAP; k++){
-		if(k>=impulses){
-			break;
-		}else{ //mysterious bug on windows requires this else
+		if(k<impulses){
 			//position of impulse in cell space - uniform distribution
 			vec2 ipos = vec2(nextRand(u), nextRand(u));
 			//displacement to fragment
-			vec2 delta = (cpos - ipos - vec2(dnbr))*gridSize;
-			acc += eval_impulse(u, delta, params);
-		}
+			vec2 delta = (fpos - ipos)*gridSize;
+			//impulse frequency, orientation - uniform distribution on input ranges
+			float ifreq = mix(h.x, h.y, nextRand(u)); 
+			float iorientation = mix(h.z, h.w, nextRand(u));
+			//evaluate kernel, accumulate fragment value
+			vec2 mu = ifreq*vec2(cos(iorientation), sin(iorientation));
+			float phi = nextRand(u); //phase - uniform dist [0, 1]
+			float filt_exp = -.5*dot(mu, params.sigma_f_plus_g_inv*mu);
+			acc+= filt_scale*exp(-PI*aps*dot(delta,delta)+filt_exp)*cos(2.*PI*(dot(delta, params.filter*mu)+phi));
+		}else {break;}
 	}
 	return acc;
  }
+
  
  float det2x2(mat2 m){
 	return (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
@@ -162,8 +157,8 @@ void main(void){
 
 	vec2 p0 = vec2(1.,1.);
 	float osx = gnoise(pos+p0, params);
-	float osy = gnoise(pos-p0, params);
-	pos=pos+.01*vec2(osx, osy);
+	//float osy = gnoise(pos-p0, params);
+	pos=pos+.01*vec2(cos(PI*osx), sin(PI*osx));
 
 	float value = gnoise(pos, params); 
 	value= value*.5+.5;
