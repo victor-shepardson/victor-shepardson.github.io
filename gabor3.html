@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>
+<a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a> with WebGL
+</h1>
+<h3>For best results, view in google chrome</h3>
+<table>
+	<tr>
+		<td><div id='control'></div></td>
+		<td><div id='main'></div></td>
+	</tr>
+</table>
+<script src="./jquery-1.11.0.js"></script>
+<script src="./gl-matrix-min.js"></script>
+<script src="./vshader.glsl.js"></script>
+<script src="./noise3.glsl.js"></script>
+<script> window.onload = function(){
+	console.log('onload...')
+	glMatrix.setMatrixArrayType(Array);
+	var vshader = genshader_vshader;
+	var fshader = genshader_noise3;
+	var viewportWidth=512, viewportHeight=512;
+	var sliderh = 100;
+	var numsliders = 6;
+	var slider_names = ['frequency','isotropy','orientation','density','gridsize','plane rotation'];
+	var slider_text = [
+		"'frequency of noise in pixels'",
+		"'directionality of noise'",
+		"'direction of noise; no effect if isotropy is high'",
+		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
+		"'size of evaluation grid in pixels; controls bandwidth of noise'",
+		"'rotate the plane noise is drawn on'"
+		];
+	var sliders = [];
+	var origin=-.5;//0.;
+	var planeSize = 10;
+	for(var i=0; i<numsliders; i++){
+		var span = $('<span title='+slider_text[i]+'><\span>').appendTo($('#control'));
+		var div = $('<div>').appendTo(span);
+		$('<h3>'+slider_names[i]+'<\h3>').appendTo(div);//$('#control'));
+		sliders[i] =
+			$('<input type="range">')
+			.appendTo(div)
+			.attr({
+				min: 0,
+				max: 1,
+				step: 0.001,
+				value: .5
+			});
+		$('</span>');
+	}
+	var gl = $('<canvas/>')
+		.appendTo($('#main'))
+		.attr('width', viewportWidth)
+		.attr('height', viewportHeight)[0]
+		.getContext('experimental-webgl');
+		
+	console.log(gl.getSupportedExtensions());
+	gl.getExtension('OES_standard_derivatives');	
+	//gl.getExtension(GL_EXT_gpu_shader4);
+		
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.enable(gl.DEPTH_TEST);
+
+	// create buffer with a rectangle
+	var vertexPositionsBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
+	var vertexPositions = [
+		-planeSize, -planeSize, -1,
+		planeSize, -planeSize, -1,
+		-planeSize, planeSize, -1,
+		planeSize, planeSize, -1
+	];
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
+	vertexPositionsBuffer.itemSize = 3;
+	vertexPositionsBuffer.numItems = 4;
+	
+	var textureCoordinatesBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+	var s = viewportWidth/Math.min(viewportWidth, viewportHeight);
+	var t = viewportHeight/Math.min(viewportWidth, viewportHeight);
+	var textureCoordinates = [
+		s, 1.0,
+		0.0, 1.0,
+		s, 1-t,
+		0.0, 1-t
+	];
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+	textureCoordinatesBuffer.itemSize = 2;
+	textureCoordinatesBuffer.numItems = 4;
+
+	var program = createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer);
+	gl.useProgram(program);
+
+	frame();
+	
+	function createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer) {
+		// create vertex shader
+		var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+		gl.shaderSource(vertexShader, vshader);
+		gl.compileShader(vertexShader);
+		if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+			console.log("vertex shader error: "+gl.getShaderInfoLog(vertexShader));
+		}
+  
+		// create fragment shader
+		var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+		gl.shaderSource(fragmentShader, fshader);
+		gl.compileShader(fragmentShader);
+		if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+			console.log("fragment shader error: "+gl.getShaderInfoLog(fragmentShader));
+		}
+		  
+		// create and use program
+		var program = gl.createProgram();
+		gl.attachShader(program, vertexShader);
+		gl.attachShader(program, fragmentShader);
+		gl.linkProgram(program);
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+			console.log("shader link error: "+gl.getProgramInfoLog(program));
+		}
+		  
+		// vertex attribute [position]
+		program.vertexPositionAttribute = gl.getAttribLocation(program, "aVertexPosition");
+		gl.enableVertexAttribArray(program.vertexPositionAttribute);
+
+		// vertex attribute [texture coordinates]
+		program.textureCoordinatesAttribute = gl.getAttribLocation(program, "aTextureCoordinates");
+		gl.enableVertexAttribArray(program.textureCoordinatesAttribute);
+
+		program.projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
+		program.modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
+		program.gridSize = gl.getUniformLocation(program, "gridSize");
+		program.density = gl.getUniformLocation(program, "density");
+		program.harmonic = gl.getUniformLocation(program, "harmonic");
+		program.origin = gl.getUniformLocation(program, "origin");
+	
+		return program;
+	}
+	
+	function frame() {
+		var gridSize = sliders[4].val()*.1+1/512;
+		var density = sliders[3].val()*100.;
+		var freq = sliders[0].val()*512.+1.;
+		var orientation = sliders[2].val()*2.*3.14;
+		var isotropy = sliders[1].val()*.5*3.14;
+		var theta = sliders[5].val()*-.5*Math.PI;
+		origin+=.001;
+		gl.uniform2f(program.origin, 0, origin);
+		gl.uniform1f(program.gridSize, gridSize);
+		gl.uniform1f(program.density, density);
+		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
+
+		var projectionMatrix = mat4.create();
+		mat4.frustum(projectionMatrix, -1, 1, -1, 1, 1, 100);
+		gl.uniformMatrix4fv(program.projectionMatrix, false, projectionMatrix);
+		
+		var mvMatrix = mat4.create();
+		var tr = vec3.fromValues(0,-1,-1);
+		var axis = vec3.fromValues(1,0,0);
+		mat4.translate(mvMatrix, mvMatrix, tr);
+		mat4.rotate(mvMatrix, mvMatrix, theta, axis);
+		vec3.negate(tr, tr);
+		mat4.translate(mvMatrix, mvMatrix, tr);
+		gl.uniformMatrix4fv(program.modelViewMatrix, false, mvMatrix);
+		
+		gl.viewport(0, 0, viewportWidth, viewportHeight);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	
+		// plug buffers to the corresponding vertex attributes
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionsBuffer);
+		gl.vertexAttribPointer(program.vertexPositionAttribute, vertexPositionsBuffer.itemSize, gl.FLOAT, false, 0, 0);
+		gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+		gl.vertexAttribPointer(program.textureCoordinatesAttribute, textureCoordinatesBuffer.itemSize, gl.FLOAT, false, 0, 0);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexPositionsBuffer.numItems);
+		
+		window.requestAnimationFrame(frame, gl);
+	}
+}</script>
+</body>
+</html>
