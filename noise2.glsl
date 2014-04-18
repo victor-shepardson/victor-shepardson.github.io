@@ -28,7 +28,7 @@ ivec2 bound_grid(ivec2 gpos){
 
 //hash based on Blum, Blum & Shub 1986
 //and Sharpe http://briansharpe.wordpress.com/2011/10/01/gpu-texture-free-noise/
-const float bbsm = 137023;//magic product of primes chosen to have high period without float precision issues
+const float bbsm = 137023.;//magic product of primes chosen to have high period without float precision issues
 vec4 bbsmod( vec4 a ) {
 	return a - floor( a * ( 1.0 / bbsm ) ) * bbsm;
 }
