@@ -7,8 +7,10 @@
 <h3>For best results, view in google chrome</h3>
 <table>
 	<tr>
-		<td><div id='control'></div></td>
+		<td><div id='controlglobal'></div></td>
+		<td><div id='controlmain'></div></td>
 		<td><div id='main'></div></td>
+		<td><div id='controlwarp'></div></td>
 	</tr>
 </table>
 <script src="./jquery-1.11.0.js"></script>
@@ -22,21 +24,49 @@
 	var fshader = genshader_noise3;
 	var viewportWidth=512, viewportHeight=512;
 	var sliderh = 100;
-	var numsliders = 6;
-	var slider_names = ['frequency','isotropy','orientation','density','gridsize','plane rotation'];
+	var numsliders = 13;
+	var slider_names = [
+		'density',
+		'gridsize',
+		'plane rotation',
+		'animation speed',
+		
+		'frequency',
+		'isotropy',
+		'orientation',
+		'octaves',
+		
+		'warp frequency',
+		'warp isotropy',
+		'warp orientation',
+		'warp octaves',
+		'warp amount'
+		];
 	var slider_text = [
+		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
+		"'size of evaluation grid in pixels; controls bandwidth of noise'",
+		"'rotate the plane noise is drawn on'",
+		"'adjust speed at which noise moves across the plane'",
+		
 		"'frequency of noise in pixels'",
 		"'directionality of noise'",
 		"'direction of noise; no effect if isotropy is high'",
-		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
-		"'size of evaluation grid in pixels; controls bandwidth of noise'",
-		"'rotate the plane noise is drawn on'"
+		"'octaves of fractal noise'",
+		
+		"'frequency of warping noise as multiple of primary'",
+		"'directionality of warping noise'",
+		"'direction of warping noise; relative to primary'",
+		"'octaves of warping noise'",
+		"'warp magnitude'",
 		];
 	var sliders = [];
 	var origin=-.5;//0.;
 	var planeSize = 10;
 	for(var i=0; i<numsliders; i++){
-		var span = $('<span title='+slider_text[i]+'><\span>').appendTo($('#control'));
+		var span = $('<span title='+slider_text[i]+'><\span>');
+		if (i<4) span.appendTo($('#controlglobal'));
+		else if (i<8) span.appendTo($('#controlmain'));
+		else span.appendTo($('#controlwarp'));
 		var div = $('<div>').appendTo(span);
 		$('<h3>'+slider_names[i]+'<\h3>').appendTo(div);//$('#control'));
 		sliders[i] =
@@ -136,23 +166,39 @@
 		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
 		program.harmonic = gl.getUniformLocation(program, "harmonic");
+		program.wharmonic = gl.getUniformLocation(program, "wharmonic");
+		program.warp = gl.getUniformLocation(program, "warp");
 		program.origin = gl.getUniformLocation(program, "origin");
 	
 		return program;
 	}
 	
 	function frame() {
-		var gridSize = sliders[4].val()*.1+1/512;
-		var density = sliders[3].val()*100.;
-		var freq = sliders[0].val()*512.+1.;
-		var orientation = sliders[2].val()*2.*3.14;
-		var isotropy = sliders[1].val()*.5*3.14;
-		var theta = sliders[5].val()*-.5*Math.PI;
-		origin+=.001;
+		
+		var freq = sliders[4].val()*512.+1.;
+		var isotropy = sliders[5].val()*.5*3.14;
+		var orientation = sliders[6].val()*2.*3.14;
+		var octaves = sliders[7].val()*6;
+		
+		var wfreq = freq*sliders[8].val()*2.;
+		var wisotropy = sliders[9].val()*.5*3.14;
+		var worientation = orientation + sliders[10].val()*2.*3.14;
+		var woctaves = sliders[11].val()*6;
+		var warp = sliders[12].val()/freq;
+		
+		var density = sliders[0].val()*200.;
+		var gridSize = sliders[1].val()*.1+1/512;
+		var theta = sliders[2].val()*-.5*Math.PI;
+		var inc = sliders[3].val()*.001;
+		
+		origin+=inc;
+		
 		gl.uniform2f(program.origin, 0, origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
-		gl.uniform4f(program.harmonic, freq, freq, orientation-isotropy, orientation+isotropy);
+		gl.uniform4f(program.harmonic, freq, Math.pow(2, octaves)*freq, orientation-isotropy, orientation+isotropy);
+		gl.uniform4f(program.wharmonic, wfreq, Math.pow(2, woctaves)*wfreq, worientation-wisotropy, worientation+wisotropy);
+		gl.uniform1f(program.warp, warp);
 
 		var projectionMatrix = mat4.create();
 		mat4.frustum(projectionMatrix, -1, 1, -1, 1, 1, 100);
