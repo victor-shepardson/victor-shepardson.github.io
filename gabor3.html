@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html>
+<link rel="stylesheet" type="text/css" href="./css/style.css">
 <body>
-<h1>
-<a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a> with WebGL
+<div>
+<h1>Domain-warped 
+<a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a>
+ for WebGL
 </h1>
-<h3>For best results, view in google chrome</h3>
+<h4>View with 
+<a href=https://www.google.com/chrome>Google Chrome</a>
+</h4>
+</div>
 <table>
 	<tr>
-		<td><div id='controlglobal'></div></td>
-		<td><div id='controlmain'></div></td>
+		<td><div id='controlglobal'><h2>global</h2></div></td>
+		<td><div id='controlmain'><h2>noise parameters</h2></div></td>
 		<td><div id='main'></div></td>
-		<td><div id='controlwarp'></div></td>
+		<td><div id='controlwarp'><h2>warping noise</h2></div></td>
 	</tr>
 </table>
 <script src="./jquery-1.11.0.js"></script>
@@ -23,6 +29,8 @@
 	var vshader = genshader_vshader;
 	var fshader = genshader_noise3;
 	var viewportWidth=512, viewportHeight=512;
+	var origin=-.5;
+	var planeSize = 100;
 	var sliderh = 100;
 	var numsliders = 13;
 	var slider_names = [
@@ -36,11 +44,11 @@
 		'orientation',
 		'octaves',
 		
-		'warp frequency',
-		'warp isotropy',
-		'warp orientation',
-		'warp octaves',
-		'warp amount'
+		'amount',
+		'frequency',
+		'isotropy',
+		'orientation',
+		'octaves',
 		];
 	var slider_text = [
 		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
@@ -56,12 +64,9 @@
 		"'frequency of warping noise as multiple of primary'",
 		"'directionality of warping noise'",
 		"'direction of warping noise; relative to primary'",
-		"'octaves of warping noise'",
-		"'warp magnitude'",
+		"'octaves of warping noise'"
 		];
 	var sliders = [];
-	var origin=-.5;//0.;
-	var planeSize = 10;
 	for(var i=0; i<numsliders; i++){
 		var span = $('<span title='+slider_text[i]+'><\span>');
 		if (i<4) span.appendTo($('#controlglobal'));
@@ -165,8 +170,8 @@
 		program.modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
 		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
-		program.harmonic = gl.getUniformLocation(program, "harmonic");
-		program.wharmonic = gl.getUniformLocation(program, "wharmonic");
+		program.sector = gl.getUniformLocation(program, "sector");
+		program.wsector = gl.getUniformLocation(program, "wsector");
 		program.warp = gl.getUniformLocation(program, "warp");
 		program.origin = gl.getUniformLocation(program, "origin");
 	
@@ -175,29 +180,29 @@
 	
 	function frame() {
 		
-		var freq = sliders[4].val()*512.+1.;
+		var freq = 32/(1-sliders[4].val()+1/64);
 		var isotropy = sliders[5].val()*.5*3.14;
-		var orientation = sliders[6].val()*2.*3.14;
-		var octaves = sliders[7].val()*6;
+		var orientation = sliders[6].val()*3.14;
+		var octaves = sliders[7].val()*8;
 		
-		var wfreq = freq*sliders[8].val()*2.;
-		var wisotropy = sliders[9].val()*.5*3.14;
-		var worientation = orientation + sliders[10].val()*2.*3.14;
-		var woctaves = sliders[11].val()*6;
-		var warp = sliders[12].val()/freq;
+		var warp = sliders[8].val()/freq;
+		var wfreq = freq*sliders[9].val()*2.;
+		var wisotropy = sliders[10].val()*.5*3.14;
+		var worientation = orientation + sliders[11].val()*3.14;
+		var woctaves = sliders[12].val()*8;
 		
-		var density = sliders[0].val()*200.;
+		var density = sliders[0].val()*200.+1.;
 		var gridSize = sliders[1].val()*.1+1/512;
 		var theta = sliders[2].val()*-.5*Math.PI;
-		var inc = sliders[3].val()*.001;
+		var inc = sliders[3].val()*.0005;
 		
 		origin+=inc;
 		
 		gl.uniform2f(program.origin, 0, origin);
 		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
-		gl.uniform4f(program.harmonic, freq, Math.pow(2, octaves)*freq, orientation-isotropy, orientation+isotropy);
-		gl.uniform4f(program.wharmonic, wfreq, Math.pow(2, woctaves)*wfreq, worientation-wisotropy, worientation+wisotropy);
+		gl.uniform4f(program.sector, freq, octaves, orientation-isotropy, orientation+isotropy);
+		gl.uniform4f(program.wsector, wfreq, woctaves, worientation-wisotropy, worientation+wisotropy);
 		gl.uniform1f(program.warp, warp);
 
 		var projectionMatrix = mat4.create();

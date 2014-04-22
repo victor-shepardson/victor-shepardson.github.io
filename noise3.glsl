@@ -14,15 +14,15 @@ varying vec3 position;
 uniform float gridSize; //side length of square grid used for evaluation
 uniform float density; //number of impulses / kernel area (accuracy)
 uniform vec2 origin; //offset of image space from texture space
-uniform vec4 harmonic; //annular sector in frequency domain: min freq, max freq, min orientation, max orientation
+uniform vec4 sector; //annular sector in frequency domain: fundamental freq, octaves, min orientation, max orientation
 
-uniform vec4 wharmonic;
+uniform vec4 wsector;
 uniform float warp;
 
 struct gnoise_params{
 	mat2 filter, sigma_f_plus_g_inv;
-	float a, a_prime_square, lambda, filterSigma, octaves;
-	vec4 harmonic;
+	float ainv, a, a_prime_square, density, filterSigma, octaves;
+	vec4 sector;
 	mat2 jacob;
 };
 
@@ -73,11 +73,11 @@ int poisson(inout float u, in float m){
 //Gabor noise based on Lagae, Lefebvre, Drettakis, Dutre 2011
   float eval_cell(in vec2 cpos, in ivec2 gpos, in ivec2 dnbr, gnoise_params params){
 	float u = seed(bound_grid(gpos+dnbr)); //deterministic seed for nbr cell
-	int impulses = poisson(u, params.lambda); //number of impulses in nbr cell
-	vec4 h = params.harmonic; //annular sector
+	int impulses = poisson(u, params.density); //number of impulses in nbr cell
+	vec4 h = params.sector; //annular sector
 	float a = params.a; //bandwidth
 	float aps = params.a_prime_square; //intermediate calculations for filtering
-	float filt_scale = aps/(a*a);
+	float filt_scale = aps*params.ainv*params.ainv;
 	vec2 fpos = cpos - vec2(dnbr);//fragment position in cell space
 	
 	float acc = 0.;
@@ -90,7 +90,7 @@ int poisson(inout float u, in float m){
 			vec2 delta = (fpos - ipos)*gridSize;
 			//impulse frequency, orientation - uniform distribution on input ranges
 			float mfreq = pow(2., nextRand(u)*params.octaves);
-			float ifreq = h.x*mfreq;//mix(h.x, h.y, nextRand(u)); 
+			float ifreq = h.x*mfreq; 
 			float iorientation = mix(h.z, h.w, nextRand(u));
 			//evaluate kernel, accumulate fragment value
 			vec2 mu = ifreq*vec2(cos(iorientation), sin(iorientation));
@@ -101,7 +101,6 @@ int poisson(inout float u, in float m){
 	}
 	return acc;
  }
-
  
  float det2x2(mat2 m){
 	return (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
@@ -113,6 +112,7 @@ int poisson(inout float u, in float m){
 	return mat2(1.,0.,0.,1.);
  }
  
+ //annular sector of pink noise
 float gnoise(vec2 pos, gnoise_params params) {
 	//compute positions for this fragment
 	vec2 temp = pos*params.a; 
@@ -123,7 +123,7 @@ float gnoise(vec2 pos, gnoise_params params) {
 	mat2 jacob_t = mat2(jacob[0][0], jacob[1][0], jacob[0][1], jacob[1][1]);
 	mat2 sigma_f_inv = (4.*PI*PI*params.filterSigma*params.filterSigma)*(jacob*jacob_t);
 	mat2 sigma_f = inv2x2(sigma_f_inv);
-	mat2 sigma_g_inv = (2.*PI/(params.a*params.a))* id2x2();
+	mat2 sigma_g_inv = (2.*PI*params.ainv*params.ainv)* id2x2();
 	mat2 sigma_g = inv2x2(sigma_g_inv);
 	mat2 sigma_fg_inv = sigma_f_inv + sigma_g_inv;
 	mat2 sigma_fg = inv2x2(sigma_fg_inv);
@@ -133,7 +133,7 @@ float gnoise(vec2 pos, gnoise_params params) {
 	params.sigma_f_plus_g_inv = inv2x2(sigma_f + sigma_g);
 	params.a_prime_square = 2.*PI*sqrt(det2x2(sigma_fg));
 	
-	params.octaves = log2(params.harmonic.y/params.harmonic.x);
+	params.octaves = params.sector.y;//log2(params.sector.y/params.sector.x);
 
 	float value = 
 		eval_cell(cpos, gpos, ivec2(-1, -1), params) +
@@ -146,8 +146,12 @@ float gnoise(vec2 pos, gnoise_params params) {
 		eval_cell(cpos, gpos, ivec2( 1,  0), params) +
 		eval_cell(cpos, gpos, ivec2( 1,  1), params);
 	
+	//float lambda = params.a*params.a*params.density;
+	
 	//ad hoc attempt to normalize
-	value*=(1./3.)/log2(params.lambda+2.);
+	//value/=log2(2.+2.*params.density);
+	value*=(1./PI)*pow(params.density, -.5);
+	//value*=(1./3.)/log2(params.density+2.);
 	float octexp = pow(2., params.octaves);
 	value*= (1.+params.octaves)*octexp/(2.*octexp-1.);
 	
@@ -157,18 +161,20 @@ float gnoise(vec2 pos, gnoise_params params) {
 void main(void){
 	vec2 pos = vTextureCoordinates.xy+origin.xy;	
 	gnoise_params params;
-	params.a = 1./gridSize;
+	params.ainv = gridSize;
+	params.a = 1./params.ainv;
 	params.filterSigma = 1.;
 	params.jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
-	params.harmonic = harmonic;
-	params.lambda = density*(1./PI); //mean impulses per grid cell
+	params.sector = sector;
+	params.density = density*(1./PI); //mean impulses per grid cell
 
 	gnoise_params wparams;
+	wparams.ainv = params.ainv;
 	wparams.a = params.a;
 	wparams.filterSigma = params.filterSigma;
 	wparams.jacob = params.jacob;
-	wparams.harmonic = wharmonic;
-	wparams.lambda = params.lambda;
+	wparams.sector = wsector;
+	wparams.density = params.density;
 	
 	vec2 p0 = vec2(1.,1.);
 	float osx = gnoise(pos+p0, wparams);
