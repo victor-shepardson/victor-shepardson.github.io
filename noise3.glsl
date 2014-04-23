@@ -1,5 +1,3 @@
-#extension GL_OES_standard_derivatives : enable
-
 #ifdef GL_ES
 precision mediump float;
 precision mediump int;
@@ -8,17 +6,6 @@ precision mediump int;
 #define PI 3.1415926535897932384626
 #define IMPULSE_CAP 100
 #define IMOD 4096
-
-varying vec2 vTextureCoordinates;
-varying vec3 position;
-
-uniform float gridSize; //side length of square grid used for evaluation
-uniform float density; //number of impulses / kernel area (accuracy)
-uniform vec2 origin; //offset of image space from texture space
-uniform vec4 sector; //annular sector in frequency domain: fundamental freq, octaves, min orientation, max orientation
-
-uniform vec4 wsector;
-uniform float warp;
 
 struct gnoise_params{
 	mat2 filter, sigma_f_plus_g_inv;
@@ -92,7 +79,7 @@ int poisson(inout float u, in float m){
 			//impulse frequency, orientation - uniform distribution on input ranges
 			float mfreq = pow(2., nextRand(u)*params.octaves);
 			float ifreq = h.x*mfreq; 
-			float iorientation = mix(h.z, h.w, nextRand(u));
+			float iorientation = mix(h.z-.5*h.w, h.z+.5*h.w, nextRand(u));
 			//evaluate kernel, accumulate fragment value
 			vec2 mu = ifreq*vec2(cos(iorientation), sin(iorientation));
 			float phi = nextRand(u); //phase - uniform dist [0, 1]
@@ -151,7 +138,7 @@ float gnoise(vec2 pos, gnoise_params params) {
 	
 	//ad hoc attempt to normalize
 	//value/=log2(2.+2.*params.density);
-	value*=(1./PI)*pow(params.density, -.5);
+	value*=(1./PI)*pow(params.density+1., -.5);
 	//value*=(1./3.)/log2(params.density+2.);
 	float octexp = pow(2., params.octaves);
 	value*= (1.+params.octaves)*octexp/(2.*octexp-1.);
@@ -159,34 +146,3 @@ float gnoise(vec2 pos, gnoise_params params) {
 	return value;
 }
  
-void main(void){
-	vec2 pos = vTextureCoordinates.xy+origin.xy;	
-	gnoise_params params;
-	params.ainv = gridSize;
-	params.a = 1./params.ainv;
-	params.filterSigma = 1.;
-	params.jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
-	params.sector = sector;
-	params.density = density*(1./PI); //mean impulses per grid cell
-
-	gnoise_params wparams;
-	wparams.ainv = params.ainv;
-	wparams.a = params.a;
-	wparams.filterSigma = params.filterSigma;
-	wparams.jacob = params.jacob;
-	wparams.sector = wsector;
-	wparams.density = params.density;
-	
-	vec2 p0 = vec2(1.,1.);
-	float osx = gnoise(pos+p0, wparams);
-	//float osy = gnoise(pos-p0, params);
-	pos=pos+warp*vec2(cos(PI*osx), sin(PI*osx));
-
-	float value = gnoise(pos, params); 
-	value= value*.5+.5;
-	
-	//monochrome
-	vec3 c = vec3(value,value,value);//.5*vec3(a_prime_square/(a*a));
-	//draw fragment
-	gl_FragColor = vec4(c, 1.0);
-}
