@@ -16,15 +16,13 @@ void main(void){
 	vec2 pos = vTextureCoordinates.xy+origin.xy;	
 	gnoise_params params;
 	params.a = bandwidth;
-	params.ainv = 1./params.a;
 	params.filterSigma = 1.;
 	params.jacob = mat2(dFdx(vTextureCoordinates.xy),dFdy(vTextureCoordinates.xy));
 	params.sector = sector;
-	params.density = density*(1./PI); //mean impulses per grid cell
+	params.density = density; //mean impulses per grid cell
 
 	gnoise_params wparams;
 	wparams.a = wbandwidth;
-	wparams.ainv = 1./wparams.a;
 	wparams.filterSigma = params.filterSigma;
 	wparams.jacob = params.jacob;
 	wparams.sector = wsector;
@@ -39,7 +37,7 @@ void main(void){
 	value= value*.5+.5;
 	
 	//monochrome
-	vec3 c = vec3(value,value,value);//.5*vec3(a_prime_square/(a*a));
+	vec3 c = vec3(value,value,value);
 	//draw fragment
 	gl_FragColor = vec4(c, 1.0);
 }
