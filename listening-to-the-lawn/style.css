@@ -1,0 +1,44 @@
+html,body,div,img,svg,button{
+position:absolute;
+padding:0%; margin:0%;
+width:100%; height:100%;
+overflow:hidden;
+}
+
+body
+{
+background-image: url('Blank_Lawn_Map_Square1500.png');
+background-size: contain;
+background-position: center center;
+background-color: #000000;
+background-repeat:no-repeat;
+}
+
+#startbutton {
+background: transparent;
+border: none !important;
+z-index:2;
+left:60%; top: 62%;
+width:30%; height:30%;
+background-image: url('enter_button.png');
+background-size: contain;
+background-position: center center;
+background-color: transparent;
+background-repeat:no-repeat;
+opacity:1.0;
+}
+#buttonimg{
+position:relative;
+}
+
+#start{
+z-index:1;
+opacity:1.0;
+background-image: url('front_page2.png');
+background-size: contain;
+background-position: center center;
+background-color: #000000;
+background-repeat:no-repeat;
+}
+
+}
