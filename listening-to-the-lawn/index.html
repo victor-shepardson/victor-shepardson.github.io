@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<link rel="stylesheet" type="text/css" href="./style.css">
+<body>
+<button hidden id="startbutton"></button>
+<div id="start"></div>
+<div id="drawing">
+</div>
+<script src="./buffer-loader.js"></script>
+<script src="./svg.min.js"></script>
+<script src="./svg.parser.min.js"></script>
+<script src="./svg.import.min.js"></script>
+<script src="./stream.js"></script>
+<script src="./midifile.js"></script>
+<script src="./player.js"></script>
+<script>
+var noteToId = {
+	5:"_x35_West",
+	6:"_x36_East",
+	//12:"EAST12_1_",
+	14:"_x31_4East",
+	//15:"WEST15_1_",
+	//16:"EAST16_1_",
+	17:"_x31_7West",
+	20:"_x32_0East",
+	22:"_x32_2East",
+	23:"_x32_3West",
+	24:"_x32_4East",
+	//25:"WEST25_1_",
+	26:"_x32_6East",
+	27:"_x32_7West",
+	29:"_x32_9West",
+	30:"_x33_0East",
+	41:"_x34_1West",
+	42:"_x34_2East",
+	44:"_x34_4East",
+	//46:"EAST46_1_",
+	48:"_x34_8East",
+	52:"_x35_2East",
+	54:"Room54East",
+	//57:"PAV57_1_",
+	//58:"PAV58_1_",
+	59:"_x35_9Pavilion9",
+	//61:"PAV61_1_",
+	63:"_x36_3Pavilion8",
+	//64:"PAV64_1_",
+	72:"_x37_2Garden6",
+	//83:"ARCade83",
+	84:"_x38_4arcadeEast",
+	85:"_x38_5Lawn",
+	87:"_x38_7Rotunda",
+	89:"_x38_9RangeWest"
+};
+ window.onload = function(){
+	var svgname = 'just_locations.svg.stripped';
+	var audioname = "final.ogg";//'schoenberg.ogg';
+	var midiname = "final.mid";//'schoenberg2.mid';
+	var audio = null;
+	var midi = null;
+	var svgstore = null;
+	var draw = SVG('drawing');
+	
+	//var front = draw.image('front_page_smaller.png', 800, 600);
+	
+	console.log('init audio...')
+	var context;
+	try {
+		window.AudioContext = window.AudioContext||window.webkitAudioContext;
+		context = new AudioContext();
+		console.log(context);
+	}
+	catch(e) {
+		alert('Web Audio API is not supported in this browser');
+	}
+
+	//start loading svg->midi->audio
+	//in audio loaded callback, create start button
+	//start button -> draw svg, start audio+midi
+	
+	loadSvg(svgname, function(svgstr) {
+		svgstore = draw.svg(svgstr);
+		initShapes();
+		loadMidi(midiname, function(midistr) {
+			console.log(midistr);
+			midi = new MidiFile(midistr);
+			console.log('midi loaded');
+			var bufferLoader = new BufferLoader(context, [audioname], function(bufferList){
+				audio = context.createBufferSource();
+				audio.loop = true;
+				audio.buffer = bufferList[0];
+				audio.connect(context.destination);
+				console.log('audio loaded');
+				enableStartButton();
+			});
+			bufferLoader.load();
+		});
+	});
+		
+	function loadSvg(path, callback) {
+		var fetch = new XMLHttpRequest();
+		fetch.open('GET', path);
+		fetch.onreadystatechange = function() {
+			if(this.readyState == 4 /*&& this.status == 200*/) {
+				callback(this.responseText);
+			}
+		}
+		fetch.send();
+	}
+	
+	function loadMidi(path, callback) {
+		var fetch = new XMLHttpRequest();
+		fetch.open('GET', path);
+		fetch.overrideMimeType("text/plain; charset=x-user-defined");
+		fetch.onreadystatechange = function() {
+			if(this.readyState == 4 /*&& this.status == 200*/) {
+				console.log('converting midi to binary string');
+				/* munge response into a binary string */
+				var t = this.responseText || "" ;
+				var ff = [];
+				var mx = t.length;
+				var scc= String.fromCharCode;
+				for (var z = 0; z < mx; z++) {
+					ff[z] = scc(t.charCodeAt(z) & 255);
+				}
+				callback(ff.join(""));
+			}
+		}
+		fetch.send();
+	}	
+	
+	function colorArea(note, color){
+		var shape = svgstore.get(noteToId[note]);
+		if (!shape) return;
+		shape._children[0]._children[0].fill(color);
+	}
+	
+	function setOpacity(note, val){
+		var shape = svgstore.get(noteToId[note]);
+		//console.log(shape.opacity());
+		if (!shape) return;
+		//shape._children[0]._children[0].opacity(1.0);
+		shape.opacity(val);
+	}
+	function decay(note, val){
+		var shape = svgstore.get(noteToId[note]);
+		//console.log(shape.opacity());
+		if (!shape) return;
+		//shape._children[0]._children[0].opacity(1.0);-
+		shape.opacity(shape.opacity()*val);
+	}
+	
+	var pavfreq = .7;
+	var regionfreq = .1;	
+	var roomfreq = 1.5;
+	var decayms = 30;
+	var decaymult = .998;
+	
+	function initShapes(){
+		for (note in noteToId){
+			var shape = svgstore.get(noteToId[note]);
+			if (!shape) return;
+			shape.opacity(0);
+			shape.active = false;
+			shape.time=0;
+			if(note<=52)
+				shape.freq=roomfreq;
+			else if (note<=64)
+				shape.freq=pavfreq;
+			else
+				shape.freq=regionfreq;
+			shape.freq*=1+Math.random()*.1;
+		}
+	}
+	
+	function setActive(note, b){
+		var shape = svgstore.get(noteToId[note]);
+		if (!shape) return;
+		if(b){
+			shape.time = 0;
+			shape.active = true;
+			}
+		else{
+			var cycle = 1000/shape.freq;
+			window.setTimeout(function(){
+				shape.active=false;
+				//shape.time=0;
+				}, 1.5*cycle-shape.time%cycle);
+			}
+	}
+	
+	function updateAll(mult){
+		var ss = document.getElementById("start"),
+			style = window.getComputedStyle(ss);
+		ss.style.opacity = style.getPropertyValue('opacity')*.99;
+		var sb = document.getElementById("startbutton"),
+			style = window.getComputedStyle(sb);
+		sb.style.opacity = style.getPropertyValue('opacity')*.95;
+		for (note in noteToId){
+			var shape = svgstore.get(noteToId[note]);
+			if (!shape) return;
+			if (shape.active){
+				//flash
+				shape.opacity(.5-.5*Math.cos(shape.time*shape.freq*.001*2*Math.PI));
+				shape.time+=decayms;
+				}
+			else{
+				//decay
+				shape.opacity(shape.opacity()*mult);			
+				}
+		}
+	}
+			
+	var player_callbacks = {
+		noteOn: function(time, channel, note, velocity){
+			console.log(note);
+			//colorArea(note, "#f06");
+			setActive(note, true);
+			
+		},
+		noteOff: function(time, channel, note, velocity){
+			//colorArea(note, "#60f");
+			//setOpacity(note, 0.0);
+			setActive(note, false);
+		},
+		programChange: function(time, number){
+		
+		},
+		lastEvent: function(){
+			startMidi();
+		}
+	}
+	
+	function startMidi(){
+		Player(midi, player_callbacks).play();
+	}
+	function start(){
+		document.getElementById("startbutton").onclick=null;
+		startMidi();
+		window.setInterval(updateAll, decayms, [decaymult]);
+		audio.start(0);		
+	}
+	function enableStartButton(){
+		var button = document.getElementById("startbutton");
+		button.removeAttribute("hidden");
+		button.onclick = start;
+		//start();
+	}
+}
+</script>
+</body>
+</html>
