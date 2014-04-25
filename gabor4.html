@@ -2,96 +2,76 @@
 <html>
 <link rel="stylesheet" type="text/css" href="./css/style.css">
 <body>
-<div id="title">
+<div>
 <h1>Domain-warped 
 <a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a>
  for WebGL
 </h1>
-<h4>try with 
-<a href=https://www.google.com/chrome>Google Chrome</a>
-or
-<a href=https://www.mozilla.org/firefox>Mozilla Firefox</a>
-</h4>
+<h4>view with google chrome</h4>
 </div>
 <table>
 	<tr>
 		<td><div id='controlglobal'><h2>global</h2></div></td>
 		<td><div id='controlmain'><h2>noise parameters</h2></div></td>
 		<td><div id='main'></div></td>
-		<td><div id='controlwarpnoise'><h2>warping noise</h2></div></td>
-		<td><div id='controlwarpparams'><h2>warp parameters</h2></div></td>
+		<td><div id='controlwarp'><h2>warping noise</h2></div></td>
 	</tr>
 </table>
 <script src="./jquery-1.11.0.js"></script>
 <script src="./gl-matrix-min.js"></script>
 <script src="./vshader.glsl.js"></script>
-<script src="./noise3.glsl.js"></script>
-<script src="./main3.glsl.js"></script>
-<script> //window.onload = function(){
+<script src="./noise4.glsl.js"></script>
+<script> window.onload = function(){
 	console.log('onload...')
 	glMatrix.setMatrixArrayType(Array);
 	var vshader = genshader_vshader;
-	var fshader = genshader_noise3+genshader_main3;
+	var fshader = genshader_noise4;
 	var viewportWidth=512, viewportHeight=512;
 	var origin=-.5;
 	var planeSize = 100;
 	var sliderh = 100;
-	var numsliders = 16;
+	var numsliders = 13;
 	var slider_names = [
 		'density',
+		'gridsize',
 		'plane rotation',
 		'animation speed',
 		
 		'frequency',
-		'octaves',
 		'isotropy',
 		'orientation',
-		'bandwidth',
-		
-		'frequency',
 		'octaves',
-		'isotropy',
-		'orientation',
-		'bandwidth',
 		
 		'amount',
-		'spread',
-		'direction'
+		'frequency',
+		'isotropy',
+		'orientation',
+		'octaves',
 		];
 	var slider_text = [
 		"'density of impulses/cell for evaluation; trades off performance for accuracy'",
+		"'size of evaluation grid in pixels; controls bandwidth of noise'",
 		"'rotate the plane noise is drawn on'",
 		"'adjust speed at which noise moves across the plane'",
 		
 		"'frequency of noise in pixels'",
-		"'octaves of pink noise'",
 		"'directionality of noise'",
 		"'direction of noise; no effect if isotropy is high'",
-		"'bandwidth as a multiple of fundamental frequency; determines grid size for evaluation'",
+		"'octaves of fractal noise'",
 		
 		"'frequency of warping noise as multiple of primary'",
-		"'octaves of warping noise'",
 		"'directionality of warping noise'",
 		"'direction of warping noise; relative to primary'",
-		"'bandwidth of warping noise'",
-		
-		"'distance to warp'",
-		"'max warp angle - min warp angle'",
-		"'mean warp angle'"
+		"'octaves of warping noise'"
 		];
-	var sliders = []; var boxes = [];
+	var sliders = [];
 	for(var i=0; i<numsliders; i++){
 		var span = $('<span title='+slider_text[i]+'><\span>');
-		if (i<3)
-			span.appendTo($('#controlglobal'));
-		else if (i<8) 
-			span.appendTo($('#controlmain'));
-		else if (i<13) 
-			span.appendTo($('#controlwarpnoise'));
-		else 
-			span.appendTo($('#controlwarpparams'));
+		if (i<4) span.appendTo($('#controlglobal'));
+		else if (i<8) span.appendTo($('#controlmain'));
+		else span.appendTo($('#controlwarp'));
 		var div = $('<div>').appendTo(span);
-		$('<h3>'+slider_names[i]+'<\h3>').appendTo(div);
+		$('<h3>'+slider_names[i]+'<\h3>').appendTo(div);//$('#control'));
 		sliders[i] =
 			$('<input type="range">')
 			.appendTo(div)
@@ -99,16 +79,9 @@ or
 				min: 0,
 				max: 1,
 				step: 0.001,
-				value: .5,
-				oninput:"sliderValues();"
+				value: .5
 			});
-		boxes[i] = 
-			$('<input type="text">')
-			.appendTo(div)
-			.attr({
-				readOnly:true,
-				size:5
-			});
+		$('</span>');
 	}
 	var gl = $('<canvas/>')
 		.appendTo($('#main'))
@@ -155,8 +128,6 @@ or
 	var program = createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer);
 	gl.useProgram(program);
 
-	sliderValues();
-	window.setInterval(animPlane, 30);
 	frame();
 	
 	function createShaderProgram(vertexPositionsBuffer, textureCoordinatesBuffer) {
@@ -195,69 +166,42 @@ or
 
 		program.projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
 		program.modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
-		program.bandwidth = gl.getUniformLocation(program, "bandwidth");
-		program.wbandwidth = gl.getUniformLocation(program, "wbandwidth");
+		program.gridSize = gl.getUniformLocation(program, "gridSize");
 		program.density = gl.getUniformLocation(program, "density");
 		program.sector = gl.getUniformLocation(program, "sector");
 		program.wsector = gl.getUniformLocation(program, "wsector");
 		program.warp = gl.getUniformLocation(program, "warp");
-		program.wspread = gl.getUniformLocation(program, "wspread");
-		program.wdirection = gl.getUniformLocation(program, "wdirection");
 		program.origin = gl.getUniformLocation(program, "origin");
 	
 		return program;
 	}
 	
-	var density,theta,inc,
-		freq,octaves,isotropy,orientation,bandwidth,
-		wfreq,woctaves,wisotropy,worientation,wbandwidth,
-		warp,wspread,wdirection;
-	function sliderValues(){
-		var minfreq = planeSize*.5;
-		var maxfreq = .25*(Math.min(viewportWidth, viewportHeight)*planeSize);
-
-		var i=0;
-		function update(v){
-			boxes[i].val(v);
-			i++;
-			return v;
-		}
+	function frame() {
 		
-		density = update(sliders[i].val()*127.+1.);
-		theta = update(sliders[i].val()*-.5*Math.PI);
-		inc = update(sliders[i].val()/planeSize*.01);
+		var freq = 32/(1-sliders[4].val()+1/64);
+		var isotropy = sliders[5].val()*.5*3.14;
+		var orientation = sliders[6].val()*3.14;
+		var octaves = sliders[7].val()*8;
 		
-		freq = update(Math.pow(2, sliders[i].val()*6)*.5*planeSize);
-		octaves = update(sliders[i].val()*8);
-		isotropy = update(sliders[i].val()*3.14);
-		orientation = update(sliders[i].val()*3.14);	
-		bandwidth = update(1/((1-sliders[i].val())*2/freq + 1/maxfreq));
+		var warp = sliders[8].val()/freq;
+		var wfreq = freq*sliders[9].val()*2.;
+		var wisotropy = sliders[10].val()*.5*3.14;
+		var worientation = orientation + sliders[11].val()*3.14;
+		var woctaves = sliders[12].val()*8;
 		
-		wfreq = update(freq*sliders[i].val()*2);
-		woctaves = update(sliders[i].val()*8);
-		wisotropy = update(sliders[i].val()*3.14);
-		worientation = update(orientation + sliders[i].val()*3.14);
-		wbandwidth = update(1/((1-sliders[i].val())*2/wfreq + 1/maxfreq));
+		var density = sliders[0].val()*200.+1.;
+		var gridSize = sliders[1].val()/planeSize+1/(64*planeSize);
+		var theta = sliders[2].val()*-.5*Math.PI;
+		var inc = sliders[3].val()*.0005;
 		
-		warp = update(sliders[i].val()/freq);
-		wspread = update(sliders[i].val()*2*Math.PI);
-		wdirection = update(sliders[i].val()*Math.PI*2);
-	}
-	
-	function animPlane(){
 		origin+=inc;
-	}
-	
-	function frame() {	
+		
 		gl.uniform2f(program.origin, 0, origin);
+		gl.uniform1f(program.gridSize, gridSize);
 		gl.uniform1f(program.density, density);
-		gl.uniform4f(program.sector, freq, octaves, orientation, isotropy);
-		gl.uniform1f(program.bandwidth, bandwidth);
-		gl.uniform4f(program.wsector, wfreq, woctaves, worientation, wisotropy);
-		gl.uniform1f(program.wbandwidth, wbandwidth);
+		gl.uniform4f(program.sector, freq, octaves, orientation-isotropy, orientation+isotropy);
+		gl.uniform4f(program.wsector, wfreq, woctaves, worientation-wisotropy, worientation+wisotropy);
 		gl.uniform1f(program.warp, warp);
-		gl.uniform1f(program.wspread, wspread);
-		gl.uniform1f(program.wdirection, wdirection);
 
 		var projectionMatrix = mat4.create();
 		mat4.frustum(projectionMatrix, -1, 1, -1, 1, 1, 100);
@@ -283,7 +227,7 @@ or
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexPositionsBuffer.numItems);
 		
 		window.requestAnimationFrame(frame, gl);
-//	}
+	}
 }</script>
 </body>
 </html>
