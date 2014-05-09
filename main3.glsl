@@ -28,7 +28,7 @@ void main(void){
 	wparams.sector = wsector;
 	wparams.density = params.density;
 	
-	vec2 p0 = vec2(1.,1.);
+	vec2 p0 = vec2(512.,512.);
 	float osx = gnoise(pos+p0, wparams);
 	//float osy = gnoise(pos-p0, params);
 	pos=pos+warp*vec2(cos(wspread*osx+wdirection), sin(wspread*osx+wdirection));

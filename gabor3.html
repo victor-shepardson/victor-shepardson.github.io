@@ -5,13 +5,14 @@
 <div id="title">
 <h1>Domain-warped 
 <a href=http://graphics.cs.kuleuven.be/publications/LLDD09PNSGC/LLDD09PNSGC_paper.pdf>Gabor noise</a>
- for WebGL
+ for WebGL | On
+<a href=https://github.com/victor-shepardson/webgl-gabor-noise>GitHub</a>
 </h1>
-<h4>try with 
-<a href=https://www.google.com/chrome>Google Chrome</a>
+<h5>try me with 
+<a href=https://www.mozilla.org/firefox>Mozilla Firefox</a> (Windows)
 or
-<a href=https://www.mozilla.org/firefox>Mozilla Firefox</a>
-</h4>
+<a href=https://www.google.com/chrome>Google Chrome</a>
+</h5>
 </div>
 <table>
 	<tr>
@@ -231,13 +232,13 @@ or
 		octaves = update(sliders[i].val()*8);
 		isotropy = update(sliders[i].val()*3.14);
 		orientation = update(sliders[i].val()*3.14);	
-		bandwidth = update(1/((1-sliders[i].val())*2/freq + 1/maxfreq));
+		bandwidth = update(1/((1-sliders[i].val())*4/freq + 1/maxfreq));
 		
 		wfreq = update(freq*sliders[i].val()*2);
 		woctaves = update(sliders[i].val()*8);
 		wisotropy = update(sliders[i].val()*3.14);
 		worientation = update(orientation + sliders[i].val()*3.14);
-		wbandwidth = update(1/((1-sliders[i].val())*2/wfreq + 1/maxfreq));
+		wbandwidth = update(1/((1-sliders[i].val())*4/wfreq + 1/maxfreq));
 		
 		warp = update(sliders[i].val()/freq);
 		wspread = update(sliders[i].val()*2*Math.PI);
@@ -249,7 +250,7 @@ or
 	}
 	
 	function frame() {	
-		gl.uniform2f(program.origin, 0, origin);
+		gl.uniform2f(program.origin, origin, origin);
 		gl.uniform1f(program.density, density);
 		gl.uniform4f(program.sector, freq, octaves, orientation, isotropy);
 		gl.uniform1f(program.bandwidth, bandwidth);
