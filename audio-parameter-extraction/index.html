@@ -1,12 +1,25 @@
-<div><img src="anim.gif"></div>
-<div>
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170819&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170818&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170812&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170811&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170810&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-</div>
+<!doctype html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<script type="text/x-mathjax-config">
+  		MathJax.Hub.Config({
+    		tex2jax: {inlineMath: [["$","$"],["\\(","\\)"]]}
+  		});
+	</script>
+	<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/2.3-latest/MathJax.js?config=TeX-AMS_HTML"></script>
+  <script src="lib/marked/marked.min.js"></script>
+  <script src="lib/jquery/jquery-2.1.1.min.js"></script>
+</head>
+<body>
+  <div id="content"></div>
+  <script>
+  	$.get('milestone.md', function(data) {
+  		dom_elem = document.getElementById('content');
+	    dom_elem.innerHTML = marked(data);
+	    MathJax.Hub.Queue(["Typeset",MathJax.Hub,dom_elem.innerHTML]);
+    	});		
+  </script>
+</body>
+</html>
