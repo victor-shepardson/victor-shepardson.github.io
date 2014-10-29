@@ -15,9 +15,14 @@
 <body>
   <div id="content"></div>
   <script>
+  	//fetch markdown
   	$.get('milestone.md', function(data) {
   		dom_elem = document.getElementById('content');
-	    dom_elem.innerHTML = marked(data);
+  		//escape underscores in markdown so as not to interfere with math
+  		data_esc = data.replace(/_/g, '\\_');
+  		//compile markdown
+	    dom_elem.innerHTML = marked(data_esc);
+	    //render math
 	    MathJax.Hub.Queue(["Typeset",MathJax.Hub,dom_elem.innerHTML]);
     	});		
   </script>
