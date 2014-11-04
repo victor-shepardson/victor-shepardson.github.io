@@ -54,7 +54,7 @@ The hyperparameters present can be summarized as following:
 
 The following are a test audio signal and resynthesized versions for a few different hyperparameter values. Images are colored on a log scale. Rows correspond to time windows and columns correspond to features. The sampling rate is 44,100Hz.
 
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170819%3Fsecret_token%3Ds-2StCB&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170819%3Fsecret_token%3Ds-2StCB&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
 
 $N_{oscs}=1, L_{window}=2048, N_{overlap}=2, K_{n}=1, N_{examples}=1000$
 
