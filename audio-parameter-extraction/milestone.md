@@ -58,20 +58,19 @@ The following are a test audio signal and resynthesized versions for a few diffe
 
 $N_{oscs}=1, L_{window}=2048, N_{overlap}=2, K_{n}=1, N_{examples}=1000$
 
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170818&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170818%3Fsecret_token%3Ds-MMNom&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
 
 $N_{oscs}=3, L_{window}=2048, N_{overlap}=2, K_{n}=1, N_{examples}=1000$
 
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170812&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170812%3Fsecret_token%3Ds-MrX9c&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
 
 $N_{oscs}=3, L_{window}=2048, N_{overlap}=2, K_{n}=1, N_{examples}=10000$
 
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170811&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
+<<iframe width="100%" height="450" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170811%3Fsecret_token%3Ds-Pbt5G&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
 
 $N_{oscs}=3, L_{window}=2048, N_{overlap}=2, K_{n}=1000, N_{examples}=10000, \sigma = .1$
 
-<iframe width="676" height="648" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170810&amp;auto_play=false&amp;hide_related=true&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
-</div>
+<iframe width="100%" height="450" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/174170810%3Fsecret_token%3Ds-I0TwR&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true"></iframe>
 
 The first two resynthesized signals differ by number of oscillators. The second produces more plausible looking spectra, but doesn't really sound any more accurate. Increasing the size of the training set in the third example to compensate the increased dimensionality seems to help. The last example turns on interpolation, which has disastrous results. This is beceause interpolating carrier frequencies and ratios expressed in Hz doesn't make much sense; multiple frequency peaks end up fighting each other, and the result is less accurate than either one. A better representation of synthesis parameters, or perhaps a different synthesis process altogether will be needed to move beyond nearest-neighbor sampling of the training set.
 
