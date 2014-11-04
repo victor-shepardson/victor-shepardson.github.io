@@ -19,12 +19,23 @@
   	$.get('milestone.md', function(data) {
   		dom_elem = document.getElementById('content');
   		//escape underscores in markdown so as not to interfere with math
-  		data_esc = data.replace(/_/g, '\\_');
+  		data_esc = escape_underscores(data);
   		//compile markdown
 	    dom_elem.innerHTML = marked(data_esc);
 	    //render math
 	    MathJax.Hub.Queue(["Typeset",MathJax.Hub,dom_elem.innerHTML]);
     	});		
+
+  	//escape underscores which do not appear between quotes
+  	//to prevent markdown from interfering with math, and also not mangling urls
+  	function escape_underscores(text){
+  		parts = text.split('"');
+  		for(i=0; i<parts.length; i+=2){
+  			parts[i] = parts[i].replace(/_/g, '\\_');
+  		}
+  		return parts.join('"');
+
+  	}
   </script>
 </body>
 </html>
