@@ -9,33 +9,120 @@
   		});
 	</script>
 	<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/2.3-latest/MathJax.js?config=TeX-AMS_HTML"></script>
-  <script src="lib/marked/marked.min.js"></script>
-  <script src="lib/jquery/jquery-2.1.1.min.js"></script>
 </head>
 <body>
-  <div id="content"></div>
-  <script>
-  	//fetch markdown
-  	$.get('milestone.md', function(data) {
-  		dom_elem = document.getElementById('content');
-  		//escape underscores in markdown so as not to interfere with math
-  		data_esc = escape_underscores(data);
-  		//compile markdown
-	    dom_elem.innerHTML = marked(data_esc);
-	    //render math
-	    MathJax.Hub.Queue(["Typeset",MathJax.Hub,dom_elem.innerHTML]);
-    	});		
+  <div id="content">
 
-  	//escape underscores which do not appear between quotes
-  	//to prevent markdown from interfering with math, and also not mangling urls
-  	function escape_underscores(text){
-  		parts = text.split('"');
-  		for(i=0; i<parts.length; i+=2){
-  			parts[i] = parts[i].replace(/_/g, '\\_');
-  		}
-  		return parts.join('"');
+<h1> Data Driven Gestural Control of a Synthesis Process by an Audio Stream</h1>
 
-  	}
-  </script>
+<h3> Victor Shepardson | Dartmouth College | CS 174 Fall 14</h3>
+
+<h2> Problem</h2>
+
+Given a synthesis process $S$ which converts a time series of synth parameters to a time series of audio samples, a basis function $b$ which maps audio to a perceptual space, and an input audio series $a$, we attempt to find the parameter series $y$ which minimizes $\lvert b(a) - b(S(y)) \rvert$. The result is a kind of gestural control of the synthesis process by the audio stream.
+
+<h2> Aesthetics</h2>
+
+The intended use of this system is artistic. The idea is to let a performer or composer map the essential gestures of a performance into a different timbral space. Exactly what constitutes a gesture (pitch? spectral envelope?) depends on $b$ and what timbres can be produced depend on $S$. Resynthesis of the original signal by $S$ also introduces direct manipulation of the derived synth parameters as an expressive control. For example, oscillators in the resynthesis process might be spread across the stereo field or tuned to a scale.
+<p>
+There are two modes of operation to consider: real time, and offline. In the real time mode, a performer should be able to use the system interactively. Efficiency and low latency are crucial; the application should be able to operate with only a few milliseconds delay and as part of a wider audio processing software ecosystem. In the offline mode, neither is required; input and output can be to static audio files on a hard drive. The offline mode is what will mostly be considered here.
+
+<h2> Approach</h2>
+
+A desirable feature of this system is that it be able to operate in real time with minimal latency, i.e. in a live improvisation setting. Therefore we divide the audio stream into short segments and map each segment to a parameter vector. We take a data driven approach to the mapping. Each short windowed segment of audio $a_i$ is converted to a feature vector $b_i = b(a_i)$. Given a training set of feature vectors $B = {b_1, \ldots b_m}$ matched with their corresponding points in the output space $Y = {y_1, \ldots y_m}$, we choose the nearest neighbor in feature space for each time window.
+
+<h2> Basis Function</h2>
+
+A good basis function should transform audio to some perceptual space. That is, the euclidean distance between examples in feature space should be small iff the corresponding signals are perceived as similar by a human. [Humans decompose audio signals into frequency components, and are deaf to the phase of those components][5]. Therefore, we consider spectral representations of the input signal. We use a [Hann window][4] to reduce artifacts from spectral processing, and an overlap factor of $N_{overlap}$. An easy starting place is a power spectrum of the windowed signal given by the magnitude of the fast fourier transform.
+<p>
+The power spectrum given by the FFT has many problems. One is that it destroys fine pitch information which is encoded in the phase spectrum. [Laroche][6] discusses the meaning of the power spectrum and describes the technique of extracting fine frequency information from the phase spectrum. Our attempts to take the phase spectrum into account when generating features were no fruitful, but it remains an area for further inquiry.
+<p>
+Another issue with the FFT is lack of perceptual weighting. Bins of the FFT are linearly spaced in frequency, but perceived pitch distances are not. We improve upon the FFT by resampling to the [Mel scale][7]. In a sense this is throwing away information; but the assumption is that this information is perceptually irrelevant. Meanwhile, perceptually less important frequencies no longer have an outsize impact on distances in feature space. Further, we apply an approximate weighting by perceived loudness to deemphasize low frequencies which are overemphasized by the Mel scale. This takes the form of a simple parabola, in decibels, over the Mel spectrum.
+<p>
+[Pachet and Aucouturier][3] describe a common basis used for finding timbral similarity between signals, the Mel-frequency cepstrum coefficients. The MFCCs encode a smoothed spectral envelope, which is good for identifying timbre but destroys pitch information. The MFCCs or power cepstrum are frequently used in speech processing and timbre similarity applications. However, we found that discarding the phase component of the cepstrum caused problems. The cepstrum encodes periodicity in the spectrum, with low quefrencies corresponding to filters. So filters with the same shape but different center frequencies (which correspond to very different timbres) are different only by a phase shift. That is, they look the same to the power cepstrum. 
+<p>
+We conjecture that this is an advantage in e.g. speech recognition, where it is a pattern of formants that encodes meaning and not their absolute position. But here we get better results by including the real and imaginary components of the cepstrum together.
+
+<h2> Synthesis Process</h2>
+
+For a synthesis process, we use frequency modulation as described by [Chowning][1]. The process consists of $N_{oscs}$ FM oscillator pairs, each parameterized by a carrier frequency, ratio of modulating frequency to carrier frequency, index of modulation, and weight $c, r, i, w$. The sample value of the process at time $t$ is then: 
+$$S(t) = \sum\limits_{i=1}^{N_{oscs}} w \sin( c t + \frac{i}{r}\sin( c r t ))$$
+We use a bank of oscillators, with the carrier frequencies variable but each restricted to a unique band. The number of FM pairs per octave is a tunable parameter.
+<p>
+Initally windowing was used on the synthesis process, with each overlapping time window corresponding to a different oscillator pair. This made the time windows less obvious in the output signal, but at the expense of the purity of the synthesis process. The current version attempts to smooth parameters to avoid egregious clicks at every window, but they are still often apparent.
+
+<h2> Envelope Following</h2>
+
+The overall amplitude of a segment of audio presents an undesirable extra degree of freedom. To eliminate it, we normalize all power spectra during feature generation, and store the constant of normalization. This envelope value can then be used to constrain the weights of each oscillator pair when generating parameters, and reapplied at the end of the synthesis process.
+
+<h2> Data Generation</h2>
+
+We generate data for our model by randomly sampling the output (synth parameter) space to produce labels $Y$. Then parameter vectors are fed through the synthesis process and basis function to produce the labeled set of features $X'$ for our supervised nonparametric model. We take into account an example of features $X$, generated from audio. In the real time mode, this should be a representative set of pitches and timbres we expect to want to resynthesize. In the offline mode this can simply the audio we want to resynthesize, and there is no notion of overfitting.
+<p>
+First, an intial set of parameters are sampled according to some implicit ad hoc distributions over the space of synth parameters: $y_i \sim P$. Then the corresponding point in feature space is given by $b_i = b(S(y_i))$. We subsequently take additional samples in an iterative process inspired by kernel estimators as described in [Scott and Sain 2005][8].
+<p>
+Iteratively: all points in $X'$ which are not a $K_{samp}$-nearest neighbor to some element of the example set $X$ are culled. Then, new samples are appended to $X'$ and $Y$ by randomly sampling a normal distribution around each extant point of $X'$. The covariance $\Sigma$ is taken to be the current covariance of $X'$. The number of new points sampled per point per interation is given by a hyperparameter $Samps_{it}$. The initial number of samples and total number of iterations are given by $Samps_{init}$ and $N_{its}$ respectively.
+<p> 
+$K_{samp}$ need only be set to 1 in the offline mode. We conjecture that it might help prevent overfitting in the real time mode.
+<p>
+We experimented with using PCA to reduce the dimensionality of $Y$ for sampling, but were unable to reliably improve speed without more substantially reducing accuracy. In the results below, the number of components is set equal to the number of oscillator pairs, which is 16; this corresponds to a fourfold reduction in dimensionality.
+<p>
+In the below figure, we demonstrate the efficacy of this adaptive sampling scheme. The mean minimum feature distance from elements of the example set to elements of the generated set is shown decreasing, with a control group which continues to sample from the prior distribution (green) shown for comparison.
+
+<p><br>
+<img src="sampling_decreasing_distance.jpg">
+
+<h2> Hyperparameters</h2>
+The hyperparameters present can be summarized as follows:
+<ul>
+<li> $N_{oscs}$ - number of FM oscillator pairs</li>
+<li> $N_{8ves}$ - the number of octaves to spread them over </li>
+<li> $L_{window}$ - length of analysis window in samples</li>
+<li> $N_{overlap}$ - number of overlapping analysis windows</li>
+<li> $K_{samps}$ - number of nearest neighbors to keep while sampling</li>
+<li> $Samps_{it}$ - number of new samples per point to take each iteration </li>
+<li> $Samps_{init}$ - number of initial samples taken from an ad hoc prior distribution of synth parameters</li>
+<li> $N_{its}$ - number of sample-cull iterations</li>
+</ul>
+
+<h2> Results</h2>
+The system is fairly effective at matching rhythm and timbral envelope. Structure in the input signal is easily discerned, constructed from the sound of exploding computers. The following examples illustrate the effect of varying the synthesis process with different numbers of oscillator pairs. All use 2048 point FFTs with overlap of 2, and train once with 1000 initial points and 100 iterations of 1 new sample/point/iteration, with gtr.wav as the example set.
+<img src="final_gtr_feats.jpg">
+<img src="final_gtr_resynth_feats_8.jpg">
+<img src="final_gtr_resynth_feats_16.jpg">
+<img src="final_gtr_resynth_feats_24.jpg">
+<iframe width="50%" height="350" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/playlists/60492749%3Fsecret_token%3Ds-Pkqzw&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=false"></iframe>
+
+<h2> Implementation Details </h2>
+All code is original work or part of MATLAB. The statistics toolbox was used, and possibly the DSP toolbox somewhere in there.
+
+<h2> Future Work</h2>
+Future work might include extension to different synthesis processes, perhaps following [Schottstaedt][2]. 
+<p>
+Further efforts to interpolate parameter vectors for better sampling and better-than-nearest-neighbor modeling might emply MDS to find a euclidean space for parameter vectors from their pairwise feature distances.
+<p>
+The [SoundSpotter][9] code could be adapted to implement the system in real time for Max/MSP, Pd and VST hosts.
+
+
+<h2>References</h2>
+[1]: http://www.jstor.org/stable/23320142 "John M. Chowning. 1977. The Synthesis of Complex Audio Spectra by Means of Frequency Modulation. Computer Music Journal, Vol. 1, No. 2 (April, 1977), pp. 46-54"
+<p>
+[2]: http://www.jstor.org/stable/40731300 "Bill Schottstaedt. The Simulation of Natural Instrument Tones using Frequency Modulation with a Complex Modulating Wave. Computer Music Journal, Vol. 1, No. 4 (November 1977), pp. 46-50"
+<p>
+[3]: http://coltrane.music.mcgill.ca/Andrew/timbre/timbre-similarity_aucoutrier.pdf "Francois Pachet and Jean-Julien Aucouturier. Improving timbre similarity: How high is the sky? Journal of negative results in speech and audio sciences 1.1 (2004): 1-13"
+<p>
+[4]: http://en.wikipedia.org/wiki/Window_function "Wikipedia: Window function"
+<p>
+[5]: http://en.wikipedia.org/wiki/Psychoacoustics "Wikipedia: Psychoacoustics"
+<p>
+[6]: http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=759041 "J. Laroche. Improved phase vocoder time-scale modification of audio. IEEE Transactions on Speech and Audio Processing. Vol. 7, Issue 3 (August 2002), pp 323-332"
+<p>
+[7]: http://en.wikipedia.org/wiki/Mel_scale "Wikipedia: Mel scale"
+<p>
+[8]: http://bama.ua.edu/~mdporter2/papers/Multi-dimensional%20density%20estimation_Scott_Sain.pdf "Scott, David W., and Stephan R. Sain. Multi-dimensional density estimation. Handbook of statistics 24.2004 (2005): 229-261."
+<p>
+[9]: http://sourceforge.net/projects/mp7c/ "SourceForge: SoundSpotter"
+
+</div>
 </body>
 </html>
