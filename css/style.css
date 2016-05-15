@@ -3,7 +3,9 @@ padding:0%; margin:0%;
 width:100%; height:100%;
 !overflow:hidden;
 /*background: linear-gradient(white, #ddd);*/
-background: linear-gradient(#bbeeff, #ff00ff);
+/*background: linear-gradient(#bbeeff, #ff00ff);*/
+/*background: linear-gradient(#eeeeee, #ee22ff, #ff00ff);*/
+background: linear-gradient(#f2eeff, #ff00ff);
 text-align: center;
 }
 a{
