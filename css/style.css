@@ -2,9 +2,27 @@ html{
 padding:0%; margin:0%;
 width:100%; height:100%;
 !overflow:hidden;
-background: linear-gradient(white, #ddd);
-
+/*background: linear-gradient(white, #ddd);*/
+background: linear-gradient(#bbeeff, #ff00ff);
+text-align: center;
 }
+a{
+	color: #dd00aa;
+}
+h1{
+	font-size: 7vw;
+}
+h2{
+	font-size: 5vw;
+}
+h3{
+	font-size: 4vw;
+}
+/*@media screen and (min-resolution: 300dpi){
+ h1{
+
+ }
+}*/
 body{
 font-family:"Arial", "sans-serif";
 }
